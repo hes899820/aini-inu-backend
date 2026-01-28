@@ -325,6 +325,117 @@ List<Pet> pets = petRepository.findByMemberId(memberId);
 List<Pet> findByMemberIdWithBreed(@Param("memberId") Long memberId);
 ```
 
+### 3. Dynamic Queries with QueryDSL
+
+**MANDATORY**: Use QueryDSL for dynamic query conditions (filtering, conditional sorting, complex searches).
+
+**When to use QueryDSL:**
+- Multiple optional search filters (e.g., search by name, breed, age range)
+- Conditional sorting based on user input
+- Complex WHERE clause combinations
+- Type-safe query construction
+
+**Repository Pattern:**
+```java
+// 1. Create custom repository interface
+public interface ThreadRepositoryCustom {
+    List<Thread> searchThreads(ThreadSearchCondition condition);
+}
+
+// 2. Implement with QueryDSL
+@RequiredArgsConstructor
+public class ThreadRepositoryImpl implements ThreadRepositoryCustom {
+    private final JPAQueryFactory queryFactory;
+
+    @Override
+    public List<Thread> searchThreads(ThreadSearchCondition condition) {
+        return queryFactory
+            .selectFrom(thread)
+            .where(
+                titleContains(condition.getTitle()),
+                locationEq(condition.getLocation()),
+                walkDateBetween(condition.getStartDate(), condition.getEndDate())
+            )
+            .orderBy(orderByCondition(condition.getSort()))
+            .fetch();
+    }
+
+    private BooleanExpression titleContains(String title) {
+        return hasText(title) ? thread.title.contains(title) : null;
+    }
+
+    private BooleanExpression locationEq(String location) {
+        return hasText(location) ? thread.location.placeName.eq(location) : null;
+    }
+
+    private BooleanExpression walkDateBetween(LocalDate start, LocalDate end) {
+        if (start == null && end == null) return null;
+        if (start == null) return thread.walkDate.loe(end);
+        if (end == null) return thread.walkDate.goe(start);
+        return thread.walkDate.between(start, end);
+    }
+
+    private OrderSpecifier<?> orderByCondition(String sort) {
+        if (sort == null) return thread.createdAt.desc();
+        return switch (sort) {
+            case "date" -> thread.walkDate.asc();
+            case "popular" -> thread.viewCount.desc();
+            default -> thread.createdAt.desc();
+        };
+    }
+}
+
+// 3. Main repository extends both
+public interface ThreadRepository extends JpaRepository<Thread, Long>, ThreadRepositoryCustom {
+    // Standard methods
+}
+```
+
+**Service Usage:**
+```java
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class ThreadService {
+    private final ThreadRepository threadRepository;
+
+    public List<ThreadResponse> searchThreads(ThreadSearchCondition condition) {
+        List<Thread> threads = threadRepository.searchThreads(condition);
+        return threads.stream()
+            .map(ThreadResponse::from)
+            .toList();
+    }
+}
+```
+
+**Why QueryDSL?**
+- Type-safe queries (compile-time error checking)
+- Cleaner than Criteria API
+- Dynamic query composition with null-safe BooleanExpression
+- Better IDE support with Q-types
+
+**Configuration Required:**
+```xml
+<!-- build.gradle -->
+dependencies {
+    implementation 'com.querydsl:querydsl-jpa:5.0.0:jakarta'
+    annotationProcessor "com.querydsl:querydsl-apt:5.0.0:jakarta"
+    annotationProcessor "jakarta.annotation:jakarta.annotation-api"
+    annotationProcessor "jakarta.persistence:jakarta.persistence-api"
+}
+```
+
+**JPAQueryFactory Bean:**
+```java
+@Configuration
+public class QueryDslConfig {
+    @Bean
+    public JPAQueryFactory jpaQueryFactory(EntityManager em) {
+        return new JPAQueryFactory(em);
+    }
+}
+```
+
 ### 3. Entity Updates (No Setters, Use Dirty Checking)
 
 ```java
@@ -386,7 +497,7 @@ public abstract class BaseTimeEntity {
 @RequiredArgsConstructor
 @Transactional(readOnly = true)  // Default for entire class
 public class MemberService {
-    
+
     // ✅ Read-only method (inherits @Transactional(readOnly=true))
     public MemberResponse getMember(Long memberId) {
         Member member = memberRepository.findById(memberId)...;
@@ -541,7 +652,7 @@ Use events for cross-context communication:
 @Service
 public class ThreadService {
     private final NotificationService notificationService;  // Different context
-    
+
     public void createThread(...) {
         Thread thread = save(...);
         notificationService.sendNotification(...);  // Tight coupling

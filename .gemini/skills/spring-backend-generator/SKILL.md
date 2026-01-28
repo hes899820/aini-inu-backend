@@ -17,6 +17,32 @@ Use this skill when you need to generate backend code for the 아이니이누 pr
 - **CRUD operations**: "Create Pet CRUD with error handling"
 - **Context setup**: "Initialize Chat context with base structure"
 
+## External Documentation (Context7 MCP)
+
+**IMPORTANT**: This skill leverages the Context7 MCP server for up-to-date Spring ecosystem documentation.
+
+When generating code or resolving framework-specific questions, use Context7 to query:
+
+- **Spring Boot** (`/spring-projects/spring-boot`) - For configuration, auto-configuration, starters
+- **Spring Framework** (`/spring-projects/spring-framework`) - For core concepts, DI, AOP
+- **Spring Data JPA** (`/spring-projects/spring-data-jpa`) - For repository patterns, query methods
+- **Hibernate** (`/hibernate/hibernate-orm`) - For JPA implementation details, annotations
+- **Lombok** (`/projectlombok/lombok`) - For annotation usage and behavior
+
+**Usage Pattern**:
+```
+1. Use mcp__context7__resolve-library-id to find the library
+2. Use mcp__context7__query-docs with specific questions
+3. Apply the documentation to code generation
+```
+
+**Example**:
+- Question: "How to use @EntityGraph to prevent N+1?"
+- Action: Query Spring Data JPA docs via Context7
+- Apply: Use the latest recommended patterns in generated repository code
+
+This ensures generated code follows the latest best practices and framework conventions.
+
 ## Quick Start
 
 ### Step 1: Read Project Conventions
@@ -85,6 +111,7 @@ view references/examples.md
 7. **Lazy loading**: All @ManyToOne and @OneToOne
 8. **Transaction**: @Transactional(readOnly=true) for queries
 9. **Lombok limits**: No @Data in entities, Entity with @NoArgsConstructor(access=PROTECTED), @Setter allowed in DTOs
+10. **Dynamic queries**: Use QueryDSL when dynamic query conditions are needed
 
 ## Typical Workflow
 
