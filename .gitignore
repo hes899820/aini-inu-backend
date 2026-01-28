@@ -38,5 +38,4 @@ out/
 
 ### security ###
 *.pem
-application.yml
 .env
