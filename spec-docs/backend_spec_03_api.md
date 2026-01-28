@@ -37,10 +37,15 @@
 
 - `errorCode`는 `{PREFIX}{NUMBER}` 형식을 사용합니다. (예: C001, M001, P001, T001, CH001, CO001, L001, N001)
 
-### 페이지네이션 응답 (PageResponse)
+### 페이지네이션 응답 (PageResponse / SliceResponse)
 
-페이지네이션이 필요한 목록 API는 `ApiResponse<PageResponse<T>>` 형태로 응답합니다.  
+페이지네이션이 필요한 목록 API는 아래 중 하나로 응답합니다.  
 `pageNumber`는 **0부터 시작**합니다. (Spring `Page.getNumber()` 기준)
+
+- **PageResponse**: 총 개수/총 페이지가 필요한 일반 페이지네이션
+- **SliceResponse**: 무한 스크롤용(Count 쿼리 없음) → `hasNext`로 다음 페이지 여부만 제공
+
+**PageResponse 예시**
 
 ```json
 {
@@ -54,6 +59,23 @@
     "totalPages": 0,
     "first": true,
     "last": true
+  }
+}
+```
+
+**SliceResponse 예시**
+
+```json
+{
+  "success": true,
+  "status": 200,
+  "data": {
+    "content": [],
+    "pageNumber": 0,
+    "pageSize": 20,
+    "first": true,
+    "last": false,
+    "hasNext": true
   }
 }
 ```
@@ -724,6 +746,7 @@
 - 작성자의 **필수 조건(Hard Filter)** 을 충족하지 못하는 회원에게는 해당 스레드가 **노출되지 않으며**, 본 API 응답에도 포함되지 않습니다.
 - 다견 가구 애견인의 필터 충족 판정은 **메인 반려견 기준**으로 수행합니다.
 - `NON_PET_OWNER`는 `allowNonPetOwner=true`인 스레드만 조회할 수 있으며, 반려견 관련 필수 조건이 있는 스레드는 조회할 수 없습니다.
+- 무한 스크롤을 위해 `SliceResponse` 형태로 응답합니다.
 
 **Query Parameters**
 
@@ -783,10 +806,9 @@
     ],
     "pageNumber": 0,
     "pageSize": 20,
-    "totalElements": 45,
-    "totalPages": 3,
     "first": true,
-    "last": false
+    "last": false,
+    "hasNext": true
   }
 }
 ```
@@ -1829,6 +1851,9 @@
 | size | integer | X | 20 | 페이지 크기 |
 | sort | string | X | -createdAt | 정렬 |
 
+**설명**:
+- 무한 스크롤을 위해 `SliceResponse` 형태로 응답합니다.
+
 **Response (200 OK)**
 ```json
 {
@@ -1853,10 +1878,9 @@
     ],
     "pageNumber": 0,
     "pageSize": 20,
-    "totalElements": 100,
-    "totalPages": 5,
     "first": true,
-    "last": false
+    "last": false,
+    "hasNext": true
   }
 }
 ```

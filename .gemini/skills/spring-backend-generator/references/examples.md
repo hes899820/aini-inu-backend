@@ -470,6 +470,8 @@ public class PetResponse {
 
 `pet/controller/PetController.java`
 
+무한 스크롤 목록 API는 `Slice` + `SliceResponse`를 사용합니다. (`SliceResponse`는 추후 추가 예정)
+
 ```java
 package com.ainiinu.pet.controller;
 
@@ -525,7 +527,7 @@ public class PetController {
         PageResponse<PetResponse> response = PageResponse.of(page);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
-    
+
     /**
      * 반려견 등록
      */

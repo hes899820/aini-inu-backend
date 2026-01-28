@@ -136,12 +136,12 @@ Phase 4: 통합
 - `@ManyToOne`, `@OneToMany`
 - `JpaRepository` 기본 CRUD
 - `@Transactional` 기초
-- 페이지네이션 (`Pageable`)
+- 페이지네이션 (`Pageable`, `Slice`)
 
 **Phase별 과제**:
 ```
 Phase 1: Post 엔티티 + PostRepository + Post CRUD
-Phase 2: Post 목록 조회 (페이지네이션)
+Phase 2: Post 목록 조회 (Slice 기반 무한 스크롤)
 Phase 3: Comment CRUD
 Phase 4: PostLike 토글 (좋아요 추가/취소)
 ```
@@ -579,7 +579,8 @@ common/
 │
 ├── response/
 │   ├── ApiResponse.java          # 공통 응답 포맷
-│   └── PageResponse.java         # 페이지네이션 응답
+│   ├── PageResponse.java         # 페이지네이션 응답 (Page)
+│   └── SliceResponse.java        # 페이지네이션 응답 (Slice)
 │
 ├── exception/
 │   ├── GlobalExceptionHandler.java

@@ -144,7 +144,7 @@ com.ainiinu/
 ├── common/
 │   ├── config/          (SecurityConfig, JpaConfig, etc.)
 │   ├── security/        (JwtTokenProvider, etc.)
-│   ├── response/        (ApiResponse, PageResponse)
+│   ├── response/        (ApiResponse, PageResponse, SliceResponse - 추후 추가 예정)
 │   ├── exception/       (GlobalExceptionHandler, BusinessException, ErrorCode interface, CommonErrorCode)
 │   ├── entity/          (BaseTimeEntity)
 │   └── util/            (DateTimeUtil, LocationUtil)
