@@ -198,6 +198,7 @@
 {
   "nickname": "건홍이네",
   "profileImageUrl": "https://s3.../profile.jpg",
+  "linkedNickname": "몽이아빠",
   "age": 29,
   "gender": "MALE",
   "mbti": "INTJ",
@@ -463,7 +464,45 @@
 | 400 | P008 | 반려견 이름 길이 초과 (최대 10자) |
 | 400 | P004 | 존재하지 않는 견종 |
 | 400 | P002 | 등록 가능 마릿수(10) 초과 |
-| 400 | P009 | 동물등록번호 검증 실패 |
+| 400 | P009 | 동물등록번호 형식 오류 (15자리 숫자가 아님) |
+| 502 | P010 | 동물등록정보 조회 실패 (공공데이터 API 응답 없음) |
+| 400 | P011 | 동물등록정보 불일치 (견종/소유자 정보가 일치하지 않음) |
+
+---
+
+### 동물등록번호 검증
+
+반려견 등록 시 `certificationNumber`를 입력하면 농림축산식품부 공공데이터 API를 통해 검증을 수행합니다.
+
+**검증 프로세스**
+
+1. **형식 검증**: 15자리 숫자인지 확인 (실패 시 `P009`)
+2. **공공 API 조회**: 농림축산식품부 동물등록정보 조회 서비스 호출 (실패 시 `P010`)
+3. **정보 일치 검증**: 반환된 견종/소유자 정보와 요청 정보 비교 (불일치 시 `P011`)
+4. **인증 완료**: 검증 성공 시 `isCertified = true`로 저장
+
+**공공데이터 API 정보**
+
+| 항목 | 내용 |
+|------|------|
+| API명 | 농림축산식품부_동물등록정보 조회서비스 |
+| Open API | https://www.data.go.kr/data/15098931/openapi.do |
+| 인증 방식 | API Key (serviceKey) |
+| 응답 형식 | XML/JSON |
+
+**응답 필드 매핑**
+
+| 공공 API 필드 | 용도 |
+|---------------|------|
+| dogRegNo | 동물등록번호 확인 |
+| kindNm | 견종 일치 검증 |
+| sexNm | 성별 참고 (선택) |
+| neuterYn | 중성화 여부 참고 (선택) |
+
+**주의사항**
+- `certificationNumber`는 선택 필드이며, 미입력 시 `isCertified = false`로 저장됩니다.
+- 공공 API 장애 시 `P010` 에러를 반환하며, 사용자에게 나중에 다시 시도하도록 안내합니다.
+- 검증 성공 시 프로필에 인증마크(✓)가 표시됩니다.
 
 ---
 
@@ -2151,6 +2190,43 @@
   }
 }
 ```
+
+**Response Fields**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| presignedUrl | string | S3 업로드용 Presigned URL (PUT 요청에 사용) |
+| imageUrl | string | 업로드 완료 후 사용할 최종 이미지 URL |
+| expiresIn | integer | URL 유효 기간 (초 단위, 300초=5분) |
+
+**업로드 흐름**
+
+1. 클라이언트가 본 API를 호출하여 `presignedUrl`과 `imageUrl`을 받음
+2. 클라이언트가 `presignedUrl`로 직접 S3에 이미지를 PUT 요청 (Content-Type 헤더 포함)
+3. 업로드 성공 후, 반환받은 `imageUrl`을 해당 도메인 API(반려견 등록, 게시물 작성 등)에 전달
+
+**S3 경로 구조**
+
+- PROFILE: `profiles/{uuid}.{extension}`
+- PET_PHOTO: `pets/{uuid}.{extension}`
+- POST: `posts/{uuid}.{extension}`
+- LOST_PET: `lost-pets/{uuid}.{extension}`
+- SIGHTING: `sightings/{uuid}.{extension}`
+
+**지원 형식**
+- `image/jpeg`
+- `image/png`
+- `image/gif`
+- `image/webp`
+
+**URL 유효 기간**: 300초 (5분)
+
+**구현 체크리스트**
+
+- [ ] Purpose별 S3 경로 분리
+- [ ] UUID 기반 파일명 생성
+- [ ] Content-Type 검증
+- [ ] Presigned URL 5분 만료 설정
 
 ---
 
