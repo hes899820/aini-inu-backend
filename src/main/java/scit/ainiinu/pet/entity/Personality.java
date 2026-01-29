@@ -17,9 +17,11 @@ public class Personality extends BaseTimeEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
-    @Column(nullable = false, length = 50)
-    private String keyword; // 예: "활발한", "겁이 많은"
-    
+
+    @Column(nullable = false, length = 20)
+    private String name;
+
+    @Column(nullable = false, length = 20, unique = true)
+    private String code;
     // TODO: 필요한 필드가 있다면 추가하세요.
 }

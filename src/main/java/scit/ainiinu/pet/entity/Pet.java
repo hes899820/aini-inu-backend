@@ -23,8 +23,31 @@ public class Pet extends BaseTimeEntity {
     
     @Column(nullable = false, length = 50)
     private String name;
-    
-    // TODO: 나머지 필드(나이, 성별, 중성화 여부 등)를 추가해보세요.
+
+    @Column(nullable = false)
+    private Integer age;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private scit.ainiinu.pet.entity.enums.PetGender gender;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private scit.ainiinu.pet.entity.enums.PetSize size;
+
+    @Column(length = 4)
+    private String mbti;
+
+    @Column(nullable = false)
+    private Boolean isNeutered;
+
+    private String photoUrl;
+
+    @Column(nullable = false)
+    private Boolean isMain;
+
+    @Column(length = 20)
+    private String certificationNumber;
     
     // TODO: Personality와의 다대다 관계는 연결 테이블(PetPersonality)을 통해 구현해야 합니다.
 }
