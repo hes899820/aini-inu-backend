@@ -1,6 +1,7 @@
 package scit.ainiinu.member.entity.enums;
 
 public enum MemberType {
-    USER,
+    PET_OWNER,
+    NON_PET_OWNER,
     ADMIN
 }
