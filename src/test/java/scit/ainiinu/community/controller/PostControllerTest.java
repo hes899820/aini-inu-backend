@@ -8,10 +8,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import scit.ainiinu.community.dto.CommentResponse;
 import scit.ainiinu.community.dto.PostCreateRequest;
+import scit.ainiinu.community.dto.PostCreateResponse;
 import scit.ainiinu.community.dto.PostDetailResponse;
 import scit.ainiinu.community.dto.PostResponse;
 import scit.ainiinu.community.service.PostService;
@@ -48,7 +50,7 @@ class PostControllerTest {
         @DisplayName("유효한 요청으로 게시글을 생성하면 성공한다")
         void create_post_api_success() throws Exception {
             // given
-            PostResponse dummy = new PostResponse();
+            PostCreateResponse dummy = new PostCreateResponse();
             given(postService.create(anyLong(), any())).willReturn(dummy);
 
             String body = """
@@ -87,7 +89,7 @@ class PostControllerTest {
             commentDummy.setContent("댓글 내용");
             dummyResponse.setComments(List.of(commentDummy));
 
-            given(postService.getPostDetail(postId)).willReturn(dummyResponse);
+            given(postService.getPostDetail(anyLong(), anyLong())).willReturn(dummyResponse);
 
             // when & then
             mockMvc.perform(get("/api/v1/posts/{postId}", postId)
