@@ -3,18 +3,18 @@ package scit.ainiinu.community.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
+import java.util.List;
+
+//게시글작성
 @Data
 @NoArgsConstructor
-//게시글작성시서버로요청
 public class PostCreateRequest {
     @NotBlank
     @Size(max = 2000)
     private String content;
 
-    @NotBlank
-    private String imageUrls;
+    @Size(max = 5)
+    private List<String> imageUrls;
 }

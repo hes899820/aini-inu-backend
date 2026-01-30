@@ -21,22 +21,14 @@ public class PostController {
 
     private final PostService postService; //PostService 주입
 
-    //게시글 조회
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<PostResponse>>> list() {
-        return ResponseEntity.ok(ApiResponse.success(postService.getPosts()));
-    }
-
     //게시글 생성
-    // Security 적용 후 @AuthenticationPrincipal로 memberId 주입 예정
-
-//    @PostMapping
-//    public ResponseEntity<ApiResponse<PostResponse>> create(
-//           // @AuthenticationPrincipal CustomUserDetails user,
-//
-//            @RequestBody @Valid PostCreateRequest request
-//    ) {
-//        PostResponse response = postService.create(user.getAuthorId(),request);
-//        return ResponseEntity.ok(ApiResponse.success(response));
-//    }
+    @PostMapping
+    public ResponseEntity<ApiResponse<PostResponse>> create(
+            @RequestBody @Valid PostCreateRequest request
+    ){
+        // TODO Security 적용 후: 로그인 사용자에서 authorId 추출
+        Long authorId = 1L; //임시 사용자
+        PostResponse response = postService.create(authorId,request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }

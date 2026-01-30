@@ -6,19 +6,26 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import scit.ainiinu.community.dto.PostCreateRequest;
 import scit.ainiinu.community.dto.PostResponse;
+import scit.ainiinu.community.entity.Post;
+import scit.ainiinu.community.repository.PostRepository;
 
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-
+@Transactional
 public class PostService {
-    public List<PostResponse> getPosts() {
-        return List.of();//임시
-    }
 
-    @Transactional
-    public PostResponse create(Long memberId, PostCreateRequest request) {
-        return null; // 임시
+    private final PostRepository postRepository;
+
+    //새글 작성
+    public PostResponse create(Long authorId, PostCreateRequest request) {
+        Post post = Post.create(
+                authorId,
+                request.getContent(),
+                request.getImageUrls()
+        );
+        Post saved = postRepository.save(post);
+        return PostResponse.from(saved);
     }
 }
