@@ -15,6 +15,7 @@ public class PostResponse {
     private List<String> imageUrls;
     private int likeCount;
     private int commentCount;
+    private boolean isLiked;
     private LocalDateTime createdAt;
 
     public static PostResponse from(Post post) {
@@ -24,6 +25,7 @@ public class PostResponse {
         r.imageUrls = post.getImageUrls();
         r.likeCount = post.getLikeCount();
         r.commentCount = post.getCommentCount();
+        r.isLiked = false; // TODO: 좋아요 여부 로직 연동 필요
         r.createdAt = post.getCreatedAt();
         //Member 아직 없으므로 임시
         r.author = Author.of(post.getAuthorId());

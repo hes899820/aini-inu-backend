@@ -10,7 +10,8 @@ import scit.ainiinu.common.exception.ErrorCode;
 public enum CommunityErrorCode implements ErrorCode {
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "CO001", "게시글을 찾을 수 없습니다"),
     INVALID_CONTENT(HttpStatus.BAD_REQUEST, "CO002", "게시글 내용은 비어있을 수 없으며 2000자를 초과할 수 없습니다"),
-    EXCEEDED_IMAGE_COUNT(HttpStatus.BAD_REQUEST, "CO003", "이미지는 최대 5개까지 업로드 가능합니다");
+    EXCEEDED_IMAGE_COUNT(HttpStatus.BAD_REQUEST, "CO003", "이미지는 최대 5개까지 업로드 가능합니다"),
+    NOT_POST_OWNER(HttpStatus.FORBIDDEN, "CO004", "게시글 수정/삭제 권한이 없습니다");
 
     private final HttpStatus httpStatus;
     private final String code;
