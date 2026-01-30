@@ -4,5 +4,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import scit.ainiinu.pet.entity.Pet;
 
 public interface PetRepository extends JpaRepository<Pet, Long> {
-    // TODO: 필요한 쿼리 메서드를 정의해보세요.
+    Integer countByMemberId(Long memberId);
+    java.util.Optional<Pet> findByMemberIdAndIsMainTrue(Long memberId);
 }
