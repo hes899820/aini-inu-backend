@@ -66,7 +66,7 @@ public class Post extends BaseTimeEntity {
     //글자수 제한 검증
     private void validateContent(String content) {
         if (content == null || content.isBlank() || content.length() > 2000) {
-            throw new BusinessException(CommunityErrorCode.INVALID_CONTENT);
+            throw new BusinessException(CommunityErrorCode.INVALID_CONTENT_LENGTH);
         }
     }
 
