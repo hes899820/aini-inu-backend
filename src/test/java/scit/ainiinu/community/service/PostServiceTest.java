@@ -289,7 +289,8 @@ class PostServiceTest {
                     .willReturn(List.of(comment1, comment2));
 
             // when
-            PostDetailResponse response = postService.getPostDetail(postId);
+            Long memberId = 1L; // 테스트용 memberId
+            PostDetailResponse response = postService.getPostDetail(memberId, postId);
 
             // then
             assertThat(response.getId()).isEqualTo(postId);

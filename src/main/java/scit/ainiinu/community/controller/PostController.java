@@ -12,6 +12,7 @@ import scit.ainiinu.common.response.SliceResponse;
 import scit.ainiinu.community.dto.CommentCreateRequest;
 import scit.ainiinu.community.dto.CommentResponse;
 import scit.ainiinu.community.dto.PostCreateRequest;
+import scit.ainiinu.community.dto.PostCreateResponse;
 import scit.ainiinu.community.dto.PostDetailResponse;
 import scit.ainiinu.community.dto.PostLikeResponse;
 import scit.ainiinu.community.dto.PostResponse;
@@ -30,7 +31,9 @@ public class PostController {
     public ResponseEntity<ApiResponse<SliceResponse<PostResponse>>> getPosts(
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        SliceResponse<PostResponse> response = postService.getPosts(pageable);
+        // TODO Security 적용 후: 로그인 사용자에서 memberId 추출
+        Long memberId = 1L; // 임시 사용자
+        SliceResponse<PostResponse> response = postService.getPosts(memberId, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -39,7 +42,9 @@ public class PostController {
     public ResponseEntity<ApiResponse<PostDetailResponse>> getPost(
             @PathVariable("postId") Long postId
     ) {
-        PostDetailResponse response = postService.getPostDetail(postId);
+        // TODO Security 적용 후: 로그인 사용자에서 memberId 추출
+        Long memberId = 1L; // 임시 사용자
+        PostDetailResponse response = postService.getPostDetail(memberId, postId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -103,12 +108,12 @@ public class PostController {
 
     //게시글 생성
     @PostMapping
-    public ResponseEntity<ApiResponse<PostResponse>> create(
+    public ResponseEntity<ApiResponse<PostCreateResponse>> create(
             @RequestBody @Valid PostCreateRequest request
     ){
         // TODO Security 적용 후: 로그인 사용자에서 authorId 추출
         Long authorId = 1L; //임시 사용자
-        PostResponse response = postService.create(authorId, request);
+        PostCreateResponse response = postService.create(authorId, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

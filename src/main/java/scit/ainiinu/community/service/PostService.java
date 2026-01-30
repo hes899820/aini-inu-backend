@@ -10,6 +10,7 @@ import scit.ainiinu.common.response.SliceResponse;
 import scit.ainiinu.community.dto.CommentCreateRequest;
 import scit.ainiinu.community.dto.CommentResponse;
 import scit.ainiinu.community.dto.PostCreateRequest;
+import scit.ainiinu.community.dto.PostCreateResponse;
 import scit.ainiinu.community.dto.PostDetailResponse;
 import scit.ainiinu.community.dto.PostLikeResponse;
 import scit.ainiinu.community.dto.PostResponse;
@@ -39,8 +40,9 @@ public class PostService {
     /**
      * 게시글 목록 조회 (무한 스크롤)
      * - 차단한 사용자의 게시글은 조회되지 않습니다.
+     * @param memberId 현재 로그인 사용자 ID (좋아요 여부 확인용)
      */
-    public SliceResponse<PostResponse> getPosts(Pageable pageable) {
+    public SliceResponse<PostResponse> getPosts(Long memberId, Pageable pageable) {
         // TODO: Member Context 완성 후 실제 차단 목록 조회 로직 추가
         List<Long> blockedUserIds = Collections.emptyList();
 
@@ -51,15 +53,16 @@ public class PostService {
             posts = postRepository.findByAuthorIdNotIn(blockedUserIds, pageable);
         }
 
-        return SliceResponse.of(posts.map(PostResponse::from));
+        return SliceResponse.of(posts.map(post -> PostResponse.from(post, memberId, postLikeRepository)));
     }
 
     /**
      * 게시글 상세 조회 (댓글 포함)
      * - 게시글 내용과 해당 게시글에 달린 댓글 목록을 반환합니다.
      * - 차단한 사용자의 댓글은 조회 목록에서 제외됩니다.
+     * @param memberId 현재 로그인 사용자 ID (좋아요 여부 확인용)
      */
-    public PostDetailResponse getPostDetail(Long postId) {
+    public PostDetailResponse getPostDetail(Long memberId, Long postId) {
         // 1. 게시글 조회 (없으면 CO001 예외)
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new BusinessException(CommunityErrorCode.POST_NOT_FOUND));
@@ -69,28 +72,28 @@ public class PostService {
 
         // 3. 차단된 사용자의 댓글 필터링
         // TODO: Member Context 완성 후 실제 차단 목록 조회
-        List<Long> blockedUserIds = Collections.emptyList(); 
-        
+        List<Long> blockedUserIds = Collections.emptyList();
+
         List<CommentResponse> commentResponses = comments.stream()
                 .filter(comment -> !blockedUserIds.contains(comment.getAuthorId()))
                 .map(CommentResponse::from)
                 .collect(Collectors.toList());
 
-        return PostDetailResponse.of(post, commentResponses);
+        return PostDetailResponse.of(post, commentResponses, memberId, postLikeRepository);
     }
 
     /**
      * 게시글 생성
      */
     @Transactional
-    public PostResponse create(Long authorId, PostCreateRequest request) {
+    public PostCreateResponse create(Long authorId, PostCreateRequest request) {
         Post post = Post.create(
                 authorId,
                 request.getContent(),
                 request.getImageUrls()
         );
         Post saved = postRepository.save(post);
-        return PostResponse.from(saved);
+        return PostCreateResponse.from(saved);
     }
 
     /**
@@ -109,10 +112,10 @@ public class PostService {
         }
 
         // 3. 내용 및 이미지 수정 (길이 검증 등은 Entity 내부에서 처리)
-        // TODO: 2000자 초과 시 CO005 예외 처리 (현재는 INVALID_CONTENT 사용 중이나, 필요 시 세분화)
         post.update(request.getContent(), request.getImageUrls());
 
-        return PostResponse.from(post);
+        // 수정한 사용자는 작성자이므로 authorId를 memberId로 사용
+        return PostResponse.from(post, authorId, postLikeRepository);
     }
 
     /**
