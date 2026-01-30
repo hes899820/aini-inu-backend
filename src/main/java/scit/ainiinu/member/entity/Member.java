@@ -46,7 +46,7 @@ public class Member extends BaseTimeEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private MemberStatus status;
+    private MemberStatus status = MemberStatus.ACTIVE;
 
     @Column(name = "linked_nickname")
     private String linkedNickname;
