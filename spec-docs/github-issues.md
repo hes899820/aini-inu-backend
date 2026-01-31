@@ -11,7 +11,7 @@
 
 ### 건홍 (26개)
 **Phase 1 - Common**
-- #1: Security 설정 구현
+- #1: 인증/인가 설정 구현 (Interceptor + ArgumentResolver)
 - #2: Location Value Object 구현
 
 **Phase 3 - Chat**
@@ -147,32 +147,57 @@
 
 ## 건홍 - Common 모듈 완성
 
-### Issue #1: Security 설정 구현
+### Issue #1: 인증/인가 설정 구현 (Interceptor + ArgumentResolver)
 **Labels**: `priority:high`, `context:common`, `phase:1`
 
 #### 1. 개요 (Overview)
-- JWT 기반 인증 및 OAuth2 소셜 로그인 지원을 위한 Security 설정을 구현합니다.
-- **Objective**: 모든 API 요청에 대해 인증/인가를 수행하고, CORS 및 예외 처리를 통합 관리합니다.
+- JWT 기반 인증을 Spring Interceptor + ArgumentResolver로 구현합니다.
+- **Objective**: 가볍고 이해하기 쉬운 인증 구조로 API 요청의 인증/인가를 수행합니다.
+- **참고**: Spring Security는 사용하지 않습니다 (불필요한 복잡성 제거).
 
 #### 2. 구현 상세 (Implementation Specs)
-- **SecurityConfig**:
-  - `formLogin`, `httpBasic` 비활성화 (Stateless)
-  - `sessionManagement`: STATELESS 설정
-  - `CorsConfiguration`: 프론트엔드 도메인 허용, `Authorization` 헤더 노출
-  - `JwtAuthenticationFilter`: Request Header의 `Authorization: Bearer` 토큰 검증
-  - `AuthenticationEntryPoint`: 인증 실패 시 401 응답 (`C101`)
-  - `AccessDeniedHandler`: 권한 부족 시 403 응답 (`C201`)
-- **JwtTokenProvider**:
-  - Access Token 생성 (만료: 1시간)
-  - Refresh Token 생성 (만료: 14일)
-  - 토큰 검증 및 Claims 파싱
-- **PermitAll Endpoints**:
-  - `/api/v1/auth/login/**` (소셜 로그인)
-  - `/api/v1/auth/refresh` (토큰 갱신)
-  - `/api/v1/breeds`, `/api/v1/personalities`, `/api/v1/walking-styles` (마스터 데이터 조회)
-  - `/api/v1/member-personality-types` (회원 성격 유형 목록)
-  - Swagger UI (`/v3/api-docs/**`, `/swagger-ui/**`)
-  - Health Check (`/actuator/health`)
+
+**핵심 컴포넌트**:
+
+| 컴포넌트 | 역할 |
+|---------|------|
+| `JwtTokenProvider` | JWT 토큰 생성/검증/파싱 |
+| `JwtAuthInterceptor` | 요청마다 토큰 검증, `@Public` 어노테이션 체크 |
+| `@CurrentMember` | Controller 파라미터에 인증된 사용자(memberId) 주입 |
+| `CurrentMemberArgumentResolver` | `@CurrentMember` 어노테이션 처리 |
+| `@Public` | 인증 불필요 API 표시 어노테이션 |
+| `LoginMember` | 인증된 사용자 정보 DTO (필요시 확장) |
+
+**WebConfig 설정**:
+- `JwtAuthInterceptor`: `/api/**` 경로에 적용
+- `CurrentMemberArgumentResolver`: ArgumentResolver 등록
+- `CorsConfiguration`: 프론트엔드 도메인 허용, `Authorization` 헤더 노출
+
+**JwtTokenProvider**:
+- Access Token 생성 (만료: 1시간)
+- Refresh Token 생성 (만료: 14일)
+- 토큰 검증 및 Claims 파싱
+
+**인증 불필요 API** (`@Public` 어노테이션 적용):
+- `POST /api/v1/auth/login/{provider}` (소셜 로그인)
+- `POST /api/v1/auth/refresh` (토큰 갱신)
+- `GET /api/v1/breeds`, `GET /api/v1/personalities`, `GET /api/v1/walking-styles` (마스터 데이터 조회)
+- `GET /api/v1/member-personality-types` (회원 성격 유형 목록)
+- Swagger UI (`/v3/api-docs/**`, `/swagger-ui/**`)
+- Health Check (`/actuator/health`)
+
+**인증 흐름**:
+```
+1. 클라이언트 → Authorization: Bearer {token}
+2. JwtAuthInterceptor.preHandle()
+   ├── @Public 어노테이션 체크 → 있으면 통과
+   ├── 토큰 추출 및 검증 (JwtTokenProvider 사용)
+   ├── 검증 성공 → request.setAttribute("memberId", memberId)
+   └── 검증 실패 → BusinessException(C101/C102/C103) throw
+3. CurrentMemberArgumentResolver.resolveArgument()
+   └── request에서 memberId 추출 → @CurrentMember 파라미터에 주입
+4. Controller 메서드 실행
+```
 
 #### 3. 예외 처리 (Error Handling)
 - `C101`: 인증이 필요합니다 (토큰 없음)
@@ -181,12 +206,13 @@
 - `C201`: 권한이 없습니다
 
 #### 4. 구현 체크리스트
-- [ ] SecurityConfig 클래스 생성 및 설정
-- [ ] JwtTokenProvider 클래스 생성 (토큰 생성/검증/파싱)
-- [ ] JwtAuthenticationFilter 생성 (OncePerRequestFilter 상속)
-- [ ] CustomAuthenticationEntryPoint 구현
-- [ ] CustomAccessDeniedHandler 구현
-- [ ] CORS 설정 (프론트엔드 도메인, 허용 헤더)
+- [ ] `@Public` 어노테이션 생성 (인증 제외용)
+- [ ] `@CurrentMember` 어노테이션 생성 (required 속성 포함)
+- [ ] `LoginMember` DTO 생성 (memberId 포함)
+- [ ] `JwtTokenProvider` 클래스 생성 (토큰 생성/검증/파싱)
+- [ ] `JwtAuthInterceptor` 생성 (HandlerInterceptor 구현)
+- [ ] `CurrentMemberArgumentResolver` 생성 (HandlerMethodArgumentResolver 구현)
+- [ ] `WebConfig`에 Interceptor, ArgumentResolver, CORS 설정
 - [ ] JWT Secret Key 환경변수 설정 (application.yml)
 - [ ] 공통 에러 응답 포맷 적용 (ApiResponse)
 
@@ -504,6 +530,27 @@
 - `M004`: 유효하지 않은 소셜 토큰
 - `M005`: 정지된 회원
 
+#### 5. 구현 체크리스트
+- [ ] `@Public` 어노테이션을 AuthController에 적용
+- [ ] OAuth 클라이언트 라이브러리 선택 (Spring Security OAuth2 Client 또는 직접 구현)
+- [ ] 소셜 Provider별 UserInfo API 호출 구현
+  - [ ] 네이버: https://openapi.naver.com/v1/nid/me
+  - [ ] 카카오: https://kapi.kakao.com/v2/user/me
+  - [ ] 구글: https://www.googleapis.com/oauth2/v3/userinfo
+- [ ] Member 엔티티 생성/조회 로직 (MemberService)
+- [ ] 건홍의 `JwtTokenProvider` 주입 및 사용
+  - [ ] `jwtTokenProvider.createAccessToken(memberId)` 호출
+  - [ ] `jwtTokenProvider.createRefreshToken(memberId)` 호출
+- [ ] RefreshToken 엔티티 저장 (RefreshTokenRepository)
+- [ ] 에러 코드 적용 (M004, M005)
+
+#### 6. 의존성 (Dependencies)
+- **선행 작업**: Issue #1 (건홍의 JwtTokenProvider 구현 완료)
+- **사용 컴포넌트**:
+  - `common/auth/JwtTokenProvider` (건홍 제공)
+  - `common/auth/@Public` 어노테이션 (건홍 제공)
+- **OAuth 라이브러리**: Spring Boot Starter OAuth2 Client 또는 WebClient
+
 ---
 
 ### Issue #9: 토큰 갱신 API
@@ -544,6 +591,23 @@
 #### 4. 예외 처리 (Error Handling)
 - `C102`: 유효하지 않은 리프레시 토큰
 
+#### 5. 구현 체크리스트
+- [ ] `@Public` 어노테이션을 AuthController에 적용
+- [ ] RefreshToken 엔티티 조회 (RefreshTokenRepository)
+- [ ] 건홍의 `JwtTokenProvider.validateToken()` 호출하여 RefreshToken 검증
+- [ ] 건홍의 `JwtTokenProvider.createAccessToken(memberId)` 호출하여 새 AccessToken 발급
+- [ ] (Optional) Refresh Token Rotation (RTR) 구현
+  - [ ] 새로운 RefreshToken 발급
+  - [ ] 기존 RefreshToken 삭제
+  - [ ] 새 RefreshToken 저장
+- [ ] 에러 코드 적용 (C102)
+
+#### 6. 의존성 (Dependencies)
+- **선행 작업**: Issue #1 (건홍의 JwtTokenProvider 구현 완료)
+- **사용 컴포넌트**:
+  - `common/auth/JwtTokenProvider` (건홍 제공)
+  - `common/auth/@Public` 어노테이션 (건홍 제공)
+
 ---
 
 ### Issue #10: 로그아웃 API
@@ -577,6 +641,16 @@
 #### 4. 예외 처리 (Error Handling)
 - `C101`: 인증 실패
 - `C102`: 유효하지 않은 리프레시 토큰
+
+#### 5. 구현 체크리스트
+- [ ] RefreshToken 엔티티 조회 (RefreshTokenRepository)
+- [ ] RefreshToken 삭제 (`refreshTokenRepository.delete()`)
+- [ ] 에러 코드 적용 (C101, C102)
+- [ ] (Optional) AccessToken Blacklist 구현 (Redis)
+
+#### 6. 참고사항 (Notes)
+- **인증 필요**: 이 API는 인증이 필요하므로 `@Public` 어노테이션을 사용하지 않습니다.
+- **AccessToken 무효화**: JWT는 Stateless이므로 AccessToken을 서버 측에서 강제로 무효화할 수 없습니다. 완벽한 로그아웃을 위해서는 Redis 기반 Token Blacklist 구현이 필요하지만, MVP에서는 RefreshToken 삭제만으로 충분합니다.
 
 ---
 
@@ -644,6 +718,33 @@
 - `M002`: 닉네임이 유효하지 않음 (길이 초과 등)
 - `M003`: 이미 사용 중인 닉네임
 
+#### 5. 구현 체크리스트
+- [ ] Controller 메서드에 `@CurrentMember Long memberId` 파라미터 추가
+- [ ] memberId로 Member 엔티티 조회 (MemberRepository)
+- [ ] 닉네임 중복 검증 (existsByNickname)
+- [ ] Member 엔티티의 `updateProfile()` 메서드 호출 (Dirty Checking)
+- [ ] MemberPersonality 연결 테이블 저장
+- [ ] 에러 코드 적용 (M002, M003)
+
+#### 6. Controller 구현 예시
+```java
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/api/v1/members")
+public class MemberController {
+    private final MemberService memberService;
+
+    @PostMapping("/profile")
+    public ResponseEntity<ApiResponse<MemberResponse>> createProfile(
+            @CurrentMember Long memberId,  // Interceptor + ArgumentResolver가 주입
+            @Valid @RequestBody MemberCreateRequest request) {
+        return ResponseEntity.ok(
+            ApiResponse.success(memberService.createProfile(memberId, request))
+        );
+    }
+}
+```
+
 ---
 
 ### Issue #12: 내 프로필 조회 API
@@ -695,6 +796,12 @@
 #### 3. 비즈니스 로직 & 제약조건 (Business Logic)
 - `pets`에는 메인 반려견(`isMain=true`) 여부가 포함되어야 함.
 
+#### 4. 구현 체크리스트
+- [ ] Controller 메서드에 `@CurrentMember Long memberId` 파라미터 추가
+- [ ] memberId를 Service 레이어로 전달
+- [ ] Member 엔티티와 Pet 목록 조회 (N+1 방지: fetch join 또는 EntityGraph)
+- [ ] MemberResponse DTO 변환
+
 ---
 
 ### Issue #13: 프로필 수정 API
@@ -722,6 +829,14 @@
 
 #### 3. 비즈니스 로직 & 제약조건 (Business Logic)
 - 닉네임 변경 시 중복 검사 (`M003`) 다시 수행.
+
+#### 4. 구현 체크리스트
+- [ ] Controller 메서드에 `@CurrentMember Long memberId` 파라미터 추가
+- [ ] memberId로 Member 엔티티 조회
+- [ ] 닉네임 변경 시 중복 검증 (자신의 닉네임은 제외)
+- [ ] Member 엔티티의 `updateProfile()` 메서드 호출 (Dirty Checking)
+- [ ] PersonalityType 변경 시 MemberPersonality 연결 테이블 업데이트
+- [ ] 에러 코드 적용 (M002, M003)
 
 ---
 
@@ -771,6 +886,13 @@
 - 민감한 정보(이메일, 전화번호 등) 제외.
 - 매너 온도, 대표 반려견 정보, 닉네임 등 공개 정보만 반환.
 
+#### 4. 구현 체크리스트
+- [ ] Controller 메서드는 `@PathVariable Long memberId`로 대상 회원 ID 수신
+- [ ] (Optional) `@CurrentMember Long currentMemberId` 추가하여 차단/신고 관계 확인
+- [ ] Member 엔티티와 Pet 목록 조회 (N+1 방지)
+- [ ] 민감 정보(email, status 등) 제외한 PublicMemberResponse DTO 변환
+- [ ] 에러 코드 적용 (M001: 존재하지 않는 회원)
+
 ---
 
 ### Issue #15: 회원 성격 유형 목록 API
@@ -795,6 +917,11 @@
   ]
 }
 ```
+
+#### 3. 구현 체크리스트
+- [ ] `@Public` 어노테이션을 Controller에 적용 (인증 불필요)
+- [ ] MemberPersonalityType 엔티티 전체 조회 (findAll)
+- [ ] PersonalityTypeResponse DTO 변환
 
 ---
 
@@ -3203,7 +3330,7 @@
 
 ```
 Phase 1 (의존성 없음):
-├── 건홍: Common 모듈, Security, Location VO
+├── 건홍: Common 모듈, 인증/인가 (Interceptor), Location VO
 ├── 동욱: Member Entity, ErrorCode
 ├── 혁진: Walk Enum (ChatType 공유)
 ├── 하늘: Post Entity 완성
