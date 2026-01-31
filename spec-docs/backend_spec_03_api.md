@@ -6,6 +6,23 @@
 - **API 버전**: v1
 - **Base URL**: `https://api.aini-inu.com/api/v1`
 - **인증 방식**: JWT Bearer Token
+- **인증 구현**: Spring Interceptor + ArgumentResolver (Spring Security 미사용)
+
+### 인증 처리 방식
+
+| 구분 | 설명 |
+|------|------|
+| **인증 필요 API** | `Authorization: Bearer {accessToken}` 헤더 필수 |
+| **인증 불필요 API** | `@Public` 어노테이션으로 표시 (로그인, 토큰 갱신 등) |
+| **인증 선택적 API** | 토큰 없이도 접근 가능, 토큰 있으면 추가 정보 제공 |
+
+**인증 불필요 API 목록**:
+- `POST /auth/login/{provider}` - 소셜 로그인
+- `POST /auth/refresh` - 토큰 갱신
+- `GET /breeds` - 견종 목록 조회
+- `GET /personalities` - 성향 카테고리 목록 조회
+- `GET /walking-styles` - 산책 스타일 목록 조회
+- `GET /member-personality-types` - 견주 성향 카테고리 목록 조회
 
 ## 3.1.1 공통 응답 포맷
 
