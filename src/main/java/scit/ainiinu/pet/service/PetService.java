@@ -85,14 +85,16 @@ public class PetService {
         }
 
         // 6. 산책 스타일(WalkingStyle) 관계 설정
-        if (request.getWalkingStyles() != null) {
-            for (String code : request.getWalkingStyles()) {
-                // 코드로 조회 (WalkingStyleRepository에 메서드 추가 필요할 수 있음 -> findAll해서 필터링 or 메서드 추가)
-                // 성능 최적화를 위해 Repository에 findByCodeIn 추가가 좋으나, 여기선 스트림으로 처리하거나 단순화
-                WalkingStyle style = walkingStyleRepository.findAll().stream()
-                        .filter(ws -> ws.getCode().equals(code))
-                        .findFirst()
-                        .orElseThrow(() -> new BusinessException(PetErrorCode.INVALID_PET_INFO)); // 적절한 에러코드
+        if (request.getWalkingStyles() != null && !request.getWalkingStyles().isEmpty()) {
+            List<WalkingStyle> styles = walkingStyleRepository.findByCodeIn(request.getWalkingStyles());
+            
+            // 요청한 코드 수와 조회된 스타일 수가 다르면 유효하지 않은 코드가 포함된 것임
+            // (중복 코드가 요청에 없다는 가정 하에, 혹은 Set으로 변환하여 비교)
+            if (styles.size() != request.getWalkingStyles().size()) {
+                 throw new BusinessException(PetErrorCode.INVALID_PET_INFO);
+            }
+            
+            for (WalkingStyle style : styles) {
                 pet.addWalkingStyle(style);
             }
         }
