@@ -85,8 +85,17 @@
 
 ```
 Phase 1: 기반 구축
-├── 건홍: 공통 모듈 (예외처리, 응답 포맷) + 초보 팀원 스켈레톤 제공
-├── 동욱: Member (선행) ⭐ 다른 팀원들이 authorId, ownerId로 참조
+├── 건홍: 공통 모듈 ⭐ 최우선 (다른 팀원들이 사용할 인프라)
+│   ├── 인증 인프라 (JwtTokenProvider, Interceptor, ArgumentResolver)
+│   ├── 예외 처리 (GlobalExceptionHandler, ErrorCode)
+│   ├── 응답 포맷 (ApiResponse, PageResponse, SliceResponse)
+│   └── 초보 팀원 스켈레톤 제공
+│
+├── 동욱: Member (건홍 완료 후 시작)
+│   ├── 건홍의 JwtTokenProvider를 사용하여 소셜 로그인 API 구현
+│   ├── Member 엔티티 생성 (다른 팀원들이 authorId, ownerId로 참조)
+│   └── RefreshToken 관리
+│
 ├── 혁진: Walk 준비 (설계)
 ├── 하늘: Community Post 엔티티
 └── 효주: Breed, Personality 조회 API
@@ -465,9 +474,20 @@ member/
 ├── repository/
 ├── service/
 ├── controller/
+│   ├── AuthController    # 소셜 로그인, 토큰 갱신, 로그아웃 (건홍의 JwtTokenProvider 사용)
+│   ├── MemberController  # 프로필 CRUD
+│   └── BlockController   # 차단 관리
 └── dto/
 ```
 **핵심 기능**: 소셜 로그인, 프로필, 차단, 매너 점수
+
+**건홍과의 역할 분리**:
+- **건홍 (Common 모듈)**: JWT 토큰 생성/검증 **도구** 제공 (`JwtTokenProvider`, `JwtAuthInterceptor`)
+- **동욱 (Member Context)**: 건홍의 도구를 **사용**하여 소셜 로그인 API 구현
+  - 네이버/카카오/구글 OAuth 토큰 검증
+  - Member 엔티티 생성/조회
+  - 건홍의 `JwtTokenProvider.createAccessToken()` 호출하여 JWT 발급
+  - RefreshToken 엔티티 저장/관리
 
 ---
 
@@ -567,15 +587,17 @@ notification/
 ```
 common/
 ├── config/
-│   ├── SecurityConfig.java
-│   ├── WebConfig.java
+│   ├── WebConfig.java            # Interceptor, ArgumentResolver 등록
 │   ├── JpaConfig.java
 │   └── SwaggerConfig.java
 │
-├── security/
-│   ├── JwtTokenProvider.java
-│   ├── JwtAuthenticationFilter.java
-│   └── CustomUserDetails.java
+├── auth/
+│   ├── JwtTokenProvider.java     # JWT 토큰 발급/검증
+│   ├── JwtAuthInterceptor.java   # 인증 인터셉터 (토큰 검증)
+│   ├── CurrentMember.java        # @CurrentMember 어노테이션
+│   ├── CurrentMemberArgumentResolver.java  # memberId 주입
+│   ├── Public.java               # @Public 어노테이션 (인증 제외)
+│   └── LoginMember.java          # 인증된 사용자 정보 DTO
 │
 ├── response/
 │   ├── ApiResponse.java          # 공통 응답 포맷
@@ -594,6 +616,86 @@ common/
 └── util/
     ├── DateTimeUtil.java
     └── LocationUtil.java         # 거리 계산 등
+```
+
+### 6.1 인증/인가 구현 가이드 (Interceptor + ArgumentResolver)
+
+> **왜 Spring Security를 사용하지 않나요?**
+>
+> 본 프로젝트는 소셜 로그인 + JWT 기반의 단순한 인증만 필요합니다.
+> Spring Security의 복잡한 필터 체인, CSRF, 세션 관리 등은 불필요하며,
+> Interceptor + ArgumentResolver 조합이 더 가볍고 이해하기 쉽습니다.
+
+#### 핵심 컴포넌트
+
+| 컴포넌트 | 역할 |
+|---------|------|
+| `JwtTokenProvider` | JWT 토큰 생성/검증/파싱 |
+| `JwtAuthInterceptor` | 요청마다 토큰 검증, `@Public` 체크 |
+| `@CurrentMember` | Controller 파라미터에 인증된 사용자 주입 |
+| `CurrentMemberArgumentResolver` | `@CurrentMember` 처리 |
+| `@Public` | 인증 불필요 API 표시 |
+
+#### 인증 흐름
+
+```
+1. 클라이언트 → Authorization: Bearer {token}
+2. JwtAuthInterceptor.preHandle()
+   ├── @Public 어노테이션 체크 → 있으면 통과
+   ├── 토큰 추출 및 검증
+   ├── 검증 성공 → request.setAttribute("memberId", memberId)
+   └── 검증 실패 → 401 Unauthorized
+3. CurrentMemberArgumentResolver.resolveArgument()
+   └── request에서 memberId 추출 → @CurrentMember 파라미터에 주입
+4. Controller 메서드 실행
+```
+
+#### 사용 예시
+
+```java
+// 인증 필요 API
+@GetMapping("/me")
+public ResponseEntity<ApiResponse<MemberResponse>> getMyProfile(
+        @CurrentMember Long memberId) {  // ArgumentResolver가 주입
+    return ResponseEntity.ok(ApiResponse.success(memberService.getProfile(memberId)));
+}
+
+// 인증 불필요 API
+@Public
+@PostMapping("/auth/login/{provider}")
+public ResponseEntity<ApiResponse<TokenResponse>> login(...) {
+    ...
+}
+
+// 인증 선택적 API (비로그인도 조회 가능, 로그인 시 추가 정보)
+@GetMapping("/posts")
+public ResponseEntity<ApiResponse<SliceResponse<PostResponse>>> getPosts(
+        @CurrentMember(required = false) Long memberId) {  // null 허용
+    ...
+}
+```
+
+#### WebConfig 설정
+
+```java
+@Configuration
+@RequiredArgsConstructor
+public class WebConfig implements WebMvcConfigurer {
+    private final JwtAuthInterceptor jwtAuthInterceptor;
+    private final CurrentMemberArgumentResolver currentMemberArgumentResolver;
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(jwtAuthInterceptor)
+                .addPathPatterns("/api/**")
+                .order(1);
+    }
+
+    @Override
+    public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
+        resolvers.add(currentMemberArgumentResolver);
+    }
+}
 ```
 
 ---
@@ -726,10 +828,10 @@ public class MemberController {
 
     @PostMapping("/profile")
     public ResponseEntity<ApiResponse<MemberResponse>> createProfile(
-            @AuthenticationPrincipal CustomUserDetails user,
+            @CurrentMember Long memberId,  // Interceptor + ArgumentResolver로 주입
             @Valid @RequestBody MemberCreateRequest request) {
         return ResponseEntity.ok(
-            ApiResponse.success(memberService.createProfile(user.getMemberId(), request))
+            ApiResponse.success(memberService.createProfile(memberId, request))
         );
     }
 }
