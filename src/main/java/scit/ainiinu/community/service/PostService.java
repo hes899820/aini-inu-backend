@@ -179,16 +179,11 @@ public class PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new BusinessException(CommunityErrorCode.POST_NOT_FOUND));
 
-        // 2. 내용 길이 검증 (Entity 저장 전 DTO validation 또는 여기서 수행)
-        if (request.getContent().length() > 500) {
-            throw new BusinessException(CommunityErrorCode.INVALID_CONTENT_LENGTH);
-        }
-
-        // 3. 댓글 엔티티 생성 및 저장
+        // 2. 댓글 엔티티 생성 및 저장 (길이 검증은 Entity 내부에서 수행)
         Comment comment = Comment.create(post, authorId, request.getContent());
         Comment savedComment = commentRepository.save(comment);
 
-        // 4. 게시글 댓글 수 증가
+        // 3. 게시글 댓글 수 증가
         post.increaseComment();
 
         return CommentResponse.from(savedComment);

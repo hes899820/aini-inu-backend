@@ -6,6 +6,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import scit.ainiinu.common.entity.BaseTimeEntity;
 
+import scit.ainiinu.common.exception.BusinessException;
+import scit.ainiinu.community.exception.CommunityErrorCode;
+
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -30,10 +33,17 @@ public class Comment extends BaseTimeEntity {
 
     // 생성 메서드
     public static Comment create(Post post, Long authorId, String content) {
+        validateContent(content);
         Comment comment = new Comment();
         comment.post = post;
         comment.authorId = authorId;
         comment.content = content;
         return comment;
+    }
+
+    private static void validateContent(String content) {
+        if (content == null || content.length() > 500) {
+            throw new BusinessException(CommunityErrorCode.INVALID_CONTENT_LENGTH);
+        }
     }
 }
