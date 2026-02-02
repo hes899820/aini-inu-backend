@@ -14,6 +14,10 @@ import scit.ainiinu.member.entity.enums.SocialProvider;
 import scit.ainiinu.member.repository.MemberRepository;
 import scit.ainiinu.member.repository.RefreshTokenRepository;
 
+import scit.ainiinu.member.dto.request.TokenRefreshRequest;
+import scit.ainiinu.member.entity.RefreshToken;
+
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -37,6 +41,41 @@ class AuthServiceTest {
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
+
+    @Test
+    @DisplayName("유효한 리프레시 토큰으로 갱신 요청 시 새 토큰을 발급한다.")
+    void refresh_Success() {
+        // given
+        String oldRefreshToken = "old-refresh-token";
+        TokenRefreshRequest request = new TokenRefreshRequest(oldRefreshToken);
+        Long memberId = 1L;
+
+        Member member = Member.builder().build();
+        ReflectionTestUtils.setField(member, "id", memberId);
+
+        RefreshToken storedToken = RefreshToken.builder()
+                .member(member)
+                .token(oldRefreshToken)
+                .expiresAt(LocalDateTime.now().plusDays(7))
+                .build();
+
+        given(jwtTokenProvider.validateAndGetMemberId(oldRefreshToken)).willReturn(memberId);
+        given(refreshTokenRepository.findByToken(oldRefreshToken)).willReturn(Optional.of(storedToken));
+        given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
+        given(jwtTokenProvider.generateAccessToken(memberId)).willReturn("new-access-token");
+        given(jwtTokenProvider.generateRefreshToken(memberId)).willReturn("new-refresh-token");
+
+        // when
+        LoginResponse response = authService.refresh(request);
+
+        // then
+        assertThat(response.getAccessToken()).isEqualTo("new-access-token");
+        assertThat(response.getRefreshToken()).isEqualTo("new-refresh-token");
+        
+        // 기존 토큰 삭제 후 새 토큰 저장 (RTR)
+        verify(refreshTokenRepository, times(1)).deleteByMember(member); 
+        verify(refreshTokenRepository, times(1)).save(any());
+    }
 
     @Test
     @DisplayName("기존 회원이 소셜 로그인을 하면 isNewMember는 false를 반환한다.")

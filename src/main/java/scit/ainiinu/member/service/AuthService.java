@@ -5,7 +5,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import scit.ainiinu.common.security.jwt.JwtTokenProvider;
+import scit.ainiinu.common.exception.BusinessException;
+import scit.ainiinu.common.exception.CommonErrorCode;
 import scit.ainiinu.member.dto.request.LoginRequest;
+import scit.ainiinu.member.dto.request.TokenRefreshRequest;
 import scit.ainiinu.member.dto.response.LoginResponse;
 import scit.ainiinu.member.entity.Member;
 import scit.ainiinu.member.entity.RefreshToken;
@@ -31,6 +34,37 @@ public class AuthService {
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
+
+    /**
+     * 토큰 갱신 (Refresh Token Rotation 적용)
+     */
+    @Transactional
+    public LoginResponse refresh(TokenRefreshRequest request) {
+        // 1. Refresh Token 검증
+        String requestToken = request.getRefreshToken();
+        Long memberId = jwtTokenProvider.validateAndGetMemberId(requestToken);
+
+        // 2. DB 저장 여부 확인
+        RefreshToken savedToken = refreshTokenRepository.findByToken(requestToken)
+                .orElseThrow(() -> new BusinessException(CommonErrorCode.INVALID_TOKEN));
+
+        // 3. 회원 확인
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new MemberException(MemberErrorCode.MEMBER_NOT_FOUND));
+
+        if (member.getStatus() == MemberStatus.BANNED) {
+            throw new MemberException(MemberErrorCode.BANNED_MEMBER);
+        }
+
+        // 4. 새 토큰 발급 (RTR: 기존 토큰 삭제 후 새 토큰 발급)
+        // 주의: validateAndGetMemberId에서 만료 체크를 하지만, DB의 expiresAt도 이중 체크 권장
+        if (savedToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            refreshTokenRepository.delete(savedToken);
+            throw new BusinessException(CommonErrorCode.EXPIRED_TOKEN);
+        }
+
+        return createLoginResponse(member, false);
+    }
 
     /**
      * 소셜 로그인 처리
