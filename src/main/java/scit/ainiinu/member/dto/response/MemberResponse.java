@@ -51,7 +51,9 @@ public class MemberResponse {
                 .personality(member.getPersonality())
                 .selfIntroduction(member.getSelfIntroduction())
                 .personalityTypes(personalityTypes)
-                .mannerTemperature(member.getMannerTemperature().getValue())
+                .mannerTemperature(member.getMannerTemperature() != null
+                        ? member.getMannerTemperature().getValue()
+                        : null)
                 .status(member.getStatus())
                 .isVerified(member.isVerified())
                 .createdAt(member.getCreatedAt())
