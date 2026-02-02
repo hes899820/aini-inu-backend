@@ -1,6 +1,7 @@
 package scit.ainiinu.member.service;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -12,6 +13,7 @@ import scit.ainiinu.member.dto.response.MemberResponse;
 import scit.ainiinu.member.entity.Member;
 import scit.ainiinu.member.entity.MemberPersonalityType;
 import scit.ainiinu.member.entity.enums.Gender;
+import scit.ainiinu.member.exception.MemberErrorCode;
 import scit.ainiinu.member.exception.MemberException;
 import scit.ainiinu.member.repository.MemberPersonalityRepository;
 import scit.ainiinu.member.repository.MemberPersonalityTypeRepository;
@@ -24,8 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.mockito.BDDMockito.then;
 
 @ExtendWith(MockitoExtension.class)
 class MemberServiceTest {
@@ -42,61 +43,89 @@ class MemberServiceTest {
     @Mock
     private MemberPersonalityRepository memberPersonalityRepository;
 
-    @Test
-    @DisplayName("회원 프로필 생성 성공 테스트")
-    void createProfile_Success() {
-        // given
-        Long memberId = 1L;
-        Member member = Member.builder()
-                .email("test@example.com")
-                .nickname("임시닉네임")
-                .build();
-        ReflectionTestUtils.setField(member, "id", memberId);
+    @Nested
+    @DisplayName("프로필 생성")
+    class CreateProfile {
 
-        MemberCreateRequest request = new MemberCreateRequest();
-        ReflectionTestUtils.setField(request, "nickname", "새닉네임");
-        ReflectionTestUtils.setField(request, "age", 25);
-        ReflectionTestUtils.setField(request, "gender", Gender.MALE);
-        ReflectionTestUtils.setField(request, "personalityTypeIds", List.of(1L, 2L));
+        @Test
+        @DisplayName("유효한 정보로 프로필을 생성하면 성공한다")
+        void createProfile_withValidInfo_succeeds() {
+            // given
+            Long memberId = 1L;
+            Member member = Member.builder()
+                    .email("test@example.com")
+                    .nickname("임시닉네임")
+                    .build();
+            ReflectionTestUtils.setField(member, "id", memberId);
 
-        MemberPersonalityType type1 = MemberPersonalityType.builder().id(1L).name("유형1").code("TYPE1").build();
-        MemberPersonalityType type2 = MemberPersonalityType.builder().id(2L).name("유형2").code("TYPE2").build();
+            MemberCreateRequest request = new MemberCreateRequest();
+            request.setNickname("새닉네임");
+            request.setAge(25);
+            request.setGender(Gender.MALE);
+            request.setPersonalityTypeIds(List.of(1L, 2L));
 
-        given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
-        given(memberRepository.existsByNickname("새닉네임")).willReturn(false);
-        given(memberPersonalityTypeRepository.findAllById(any())).willReturn(List.of(type1, type2));
+            MemberPersonalityType type1 = MemberPersonalityType.builder().id(1L).name("유형1").code("TYPE1").build();
+            MemberPersonalityType type2 = MemberPersonalityType.builder().id(2L).name("유형2").code("TYPE2").build();
 
-        // when
-        MemberResponse response = memberService.createProfile(memberId, request);
+            given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
+            given(memberRepository.existsByNickname("새닉네임")).willReturn(false);
+            given(memberPersonalityTypeRepository.findAllById(any())).willReturn(List.of(type1, type2));
 
-        // then
-        assertThat(response.getNickname()).isEqualTo("새닉네임");
-        assertThat(response.getAge()).isEqualTo(25);
-        assertThat(response.getGender()).isEqualTo(Gender.MALE);
-        assertThat(response.getPersonalityTypes()).hasSize(2);
-        
-        verify(memberPersonalityRepository, times(1)).deleteByMember(any());
-        verify(memberPersonalityRepository, times(1)).saveAll(any());
-    }
+            // when
+            MemberResponse response = memberService.createProfile(memberId, request);
 
-    @Test
-    @DisplayName("중복된 닉네임으로 프로필 생성 시 예외 발생")
-    void createProfile_DuplicateNickname() {
-        // given
-        Long memberId = 1L;
-        Member member = Member.builder()
-                .email("test@example.com")
-                .nickname("임시닉네임")
-                .build();
-        
-        MemberCreateRequest request = new MemberCreateRequest();
-        ReflectionTestUtils.setField(request, "nickname", "중복닉네임");
+            // then
+            assertThat(response.getNickname()).isEqualTo("새닉네임");
+            assertThat(response.getAge()).isEqualTo(25);
+            assertThat(response.getGender()).isEqualTo(Gender.MALE);
+            assertThat(response.getPersonalityTypes()).hasSize(2);
 
-        given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
-        given(memberRepository.existsByNickname("중복닉네임")).willReturn(true);
+            then(memberPersonalityRepository).should().deleteByMember(any());
+            then(memberPersonalityRepository).should().saveAll(any());
+        }
 
-        // when & then
-        assertThatThrownBy(() -> memberService.createProfile(memberId, request))
-                .isInstanceOf(MemberException.class);
+        @Test
+        @DisplayName("중복된 닉네임으로 생성하면 DUPLICATE_NICKNAME 예외가 발생한다")
+        void createProfile_withDuplicateNickname_throwsException() {
+            // given
+            Long memberId = 1L;
+            Member member = Member.builder()
+                    .email("test@example.com")
+                    .nickname("임시닉네임")
+                    .build();
+
+            MemberCreateRequest request = new MemberCreateRequest();
+            request.setNickname("중복닉네임");
+
+            given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
+            given(memberRepository.existsByNickname("중복닉네임")).willReturn(true);
+
+            // when & then
+            assertThatThrownBy(() -> memberService.createProfile(memberId, request))
+                    .isInstanceOf(MemberException.class)
+                    .satisfies(exception -> {
+                        MemberException memberException = (MemberException) exception;
+                        assertThat(memberException.getErrorCode()).isEqualTo(MemberErrorCode.DUPLICATE_NICKNAME);
+                    });
+        }
+
+        @Test
+        @DisplayName("존재하지 않는 회원 ID로 생성하면 MEMBER_NOT_FOUND 예외가 발생한다")
+        void createProfile_withNonExistentMember_throwsException() {
+            // given
+            Long memberId = 999L;
+            MemberCreateRequest request = new MemberCreateRequest();
+            request.setNickname("새닉네임");
+
+            given(memberRepository.findById(memberId)).willReturn(Optional.empty());
+
+            // when & then
+            assertThatThrownBy(() -> memberService.createProfile(memberId, request))
+                    .isInstanceOf(MemberException.class)
+                    .satisfies(exception -> {
+                        MemberException memberException = (MemberException) exception;
+                        assertThat(memberException.getErrorCode()).isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND);
+                    });
+        }
     }
 }
