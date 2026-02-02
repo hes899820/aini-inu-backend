@@ -11,6 +11,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
+import scit.ainiinu.common.security.interceptor.JwtAuthInterceptor;
+import scit.ainiinu.common.security.resolver.CurrentMemberArgumentResolver;
 import scit.ainiinu.community.dto.CommentResponse;
 import scit.ainiinu.community.dto.PostCreateRequest;
 import scit.ainiinu.community.dto.PostCreateResponse;
@@ -19,6 +21,7 @@ import scit.ainiinu.community.dto.PostResponse;
 import scit.ainiinu.community.service.PostService;
 
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -39,8 +42,19 @@ class PostControllerTest {
     @MockitoBean
     private PostService postService;
 
+    @MockitoBean
+    private JwtAuthInterceptor jwtAuthInterceptor;
+
+    @MockitoBean
+    private CurrentMemberArgumentResolver currentMemberArgumentResolver;
+
     @Autowired
     private ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        given(jwtAuthInterceptor.preHandle(any(), any(), any())).willReturn(true);
+    }
 
     @Nested
     @DisplayName("게시글 생성")

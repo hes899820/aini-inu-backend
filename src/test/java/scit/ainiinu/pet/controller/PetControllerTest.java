@@ -9,6 +9,8 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import scit.ainiinu.common.security.interceptor.JwtAuthInterceptor;
+import scit.ainiinu.common.security.resolver.CurrentMemberArgumentResolver;
 import scit.ainiinu.pet.dto.request.PetCreateRequest;
 import scit.ainiinu.pet.dto.response.BreedResponse;
 import scit.ainiinu.pet.dto.response.PersonalityResponse;
@@ -19,6 +21,7 @@ import scit.ainiinu.pet.service.PetService;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -41,6 +44,17 @@ class PetControllerTest {
 
     @MockitoBean
     private PetService petService;
+
+    @MockitoBean
+    private JwtAuthInterceptor jwtAuthInterceptor;
+
+    @MockitoBean
+    private CurrentMemberArgumentResolver currentMemberArgumentResolver;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        given(jwtAuthInterceptor.preHandle(any(), any(), any())).willReturn(true);
+    }
 
     @Test
     @DisplayName("반려견 등록 API 성공 테스트")
