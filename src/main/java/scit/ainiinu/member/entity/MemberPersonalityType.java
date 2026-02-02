@@ -24,7 +24,7 @@ public class MemberPersonalityType extends BaseTimeEntity {
     @Column(nullable = false, length = 50)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = false, unique = true, length = 30)
     private String code;
 
     public MemberPersonalityType(String name, String code) {
