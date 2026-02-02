@@ -7,11 +7,13 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import scit.ainiinu.member.entity.enums.Gender;
 
 import java.util.List;
 
 @Getter
+@Setter
 @NoArgsConstructor
 public class MemberCreateRequest {
 
