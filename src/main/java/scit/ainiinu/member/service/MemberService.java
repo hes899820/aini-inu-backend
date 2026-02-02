@@ -74,10 +74,6 @@ public class MemberService {
 
         List<MemberPersonalityType> types = memberPersonalityTypeRepository.findAllById(typeIds);
         
-        // 유효하지 않은 ID가 있는지 검증 (선택적)
-        if (types.size() != typeIds.size()) {
-             // throw new MemberException(MemberErrorCode.INVALID_INPUT); // 필요 시 에러 처리
-        }
 
         List<MemberPersonality> newPersonalities = types.stream()
                 .map(type -> MemberPersonality.builder()
