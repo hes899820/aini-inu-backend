@@ -15,7 +15,6 @@ import lombok.NoArgsConstructor;
 import scit.ainiinu.common.entity.BaseTimeEntity;
 import scit.ainiinu.common.exception.BusinessException;
 import scit.ainiinu.common.exception.CommonErrorCode;
-import scit.ainiinu.common.exception.BusinessException;
 import scit.ainiinu.member.entity.enums.Gender;
 import scit.ainiinu.member.entity.enums.MemberStatus;
 import scit.ainiinu.member.entity.enums.MemberType;
