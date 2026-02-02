@@ -48,10 +48,40 @@ class PetServiceTest {
     private PersonalityRepository personalityRepository;
     @Mock
     private WalkingStyleRepository walkingStyleRepository;
+    @Mock
+    private AnimalCertificationService animalCertificationService;
 
     @Nested
     @DisplayName("반려견 등록")
     class CreatePet {
+
+        @Test
+        @DisplayName("성공: 동물등록번호 검증이 성공하면 isCertified=true로 저장된다")
+        void success_certification_verified() {
+            // given
+            Long memberId = 1L;
+            PetCreateRequest request = createRequest();
+            request.setCertificationNumber("123456789012345");
+
+            given(petRepository.countByMemberId(memberId)).willReturn(0);
+            given(breedRepository.findById(request.getBreedId())).willReturn(Optional.of(mock(Breed.class)));
+            given(animalCertificationService.verify(request.getCertificationNumber())).willReturn(true); // 검증 성공
+            
+            // save 호출 시 전달된 Pet 객체를 캡처하여 검증해도 되지만, 여기서는 반환값으로 확인
+            given(petRepository.save(any(Pet.class))).willAnswer(invocation -> {
+                Pet p = invocation.getArgument(0);
+                // 강제로 ID 주입 (테스트용)
+                // ReflectionTestUtils.setField(p, "id", 1L); 
+                return p;
+            });
+
+            // when
+            PetResponse response = petService.createPet(memberId, request);
+
+            // then
+            assertThat(response.getIsCertified()).isTrue();
+            then(animalCertificationService).should().verify(request.getCertificationNumber());
+        }
 
         @Test
         @DisplayName("성공: 첫 반려견 등록 시 자동으로 메인 반려견이 된다")

@@ -31,6 +31,7 @@ public class PetService {
     private final BreedRepository breedRepository;
     private final PersonalityRepository personalityRepository;
     private final WalkingStyleRepository walkingStyleRepository;
+    private final AnimalCertificationService animalCertificationService;
 
     /**
      * 반려견 등록
@@ -47,19 +48,20 @@ public class PetService {
         Breed breed = breedRepository.findById(request.getBreedId())
                 .orElseThrow(() -> new BusinessException(PetErrorCode.BREED_NOT_FOUND));
 
-        // 3. 메인 반려견 설정 로직
-        // 첫 등록이면 무조건 메인, 아니면 요청값 따르되 기본은 false
+        // 3. 동물등록번호 검증 (선택 사항)
+        boolean isCertified = animalCertificationService.verify(request.getCertificationNumber());
+
+        // 4. 메인 반려견 설정 로직
         boolean isMain = false;
         if (currentCount == 0) {
             isMain = true;
         } else if (request.getIsMain() != null && request.getIsMain()) {
-            // 이미 메인이 있는데 새로 메인으로 등록하려는 경우, 기존 메인 해제 필요
             petRepository.findByMemberIdAndIsMainTrue(memberId)
                     .ifPresent(mainPet -> mainPet.setMain(false));
             isMain = true;
         }
 
-        // 4. Pet 엔티티 생성
+        // 5. Pet 엔티티 생성
         Pet pet = Pet.builder()
                 .memberId(memberId)
                 .breed(breed)
@@ -72,10 +74,10 @@ public class PetService {
                 .photoUrl(request.getPhotoUrl())
                 .isMain(isMain)
                 .certificationNumber(request.getCertificationNumber())
-                .isCertified(false) // 초기엔 미인증, 추후 검증 API 통해 true로 변경
+                .isCertified(isCertified)
                 .build();
 
-        // 5. 성향(Personality) 관계 설정
+        // 6. 성향(Personality) 및 산책 스타일 관계 설정
         if (request.getPersonalityIds() != null) {
             for (Long pId : request.getPersonalityIds()) {
                 Personality personality = personalityRepository.findById(pId)
@@ -84,25 +86,19 @@ public class PetService {
             }
         }
 
-        // 6. 산책 스타일(WalkingStyle) 관계 설정
         if (request.getWalkingStyles() != null && !request.getWalkingStyles().isEmpty()) {
             List<WalkingStyle> styles = walkingStyleRepository.findByCodeIn(request.getWalkingStyles());
-            
-            // 요청한 코드 수와 조회된 스타일 수가 다르면 유효하지 않은 코드가 포함된 것임
-            // (중복 코드가 요청에 없다는 가정 하에, 혹은 Set으로 변환하여 비교)
             if (styles.size() != request.getWalkingStyles().size()) {
                  throw new BusinessException(PetErrorCode.INVALID_PET_INFO);
             }
-            
-            for (WalkingStyle style : styles) {
-                pet.addWalkingStyle(style);
-            }
+            styles.forEach(pet::addWalkingStyle);
         }
 
         // 7. 저장
         Pet savedPet = petRepository.save(pet);
 
-        // TODO: 회원의 memberType을 PET_OWNER로 변경하는 로직 필요 (MemberService)
+        // TODO:  MemberService.updateMemberType(memberId, PET_OWNER) 호출 필요
+        // 회원 타입 자동 전환: 첫 반려견 등록 시 회원의 memberType이 NON_PET_OWNER -> PET_OWNER로 변경되어야 함.
 
         return toResponse(savedPet);
     }
