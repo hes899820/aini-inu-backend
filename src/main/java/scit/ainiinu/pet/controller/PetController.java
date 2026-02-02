@@ -29,11 +29,12 @@ public class PetController {
      * 반려견 등록
      */
     @PostMapping("/pets")
-    public ResponseEntity<ApiResponse<PetResponse>> createPet(@Valid @RequestBody PetCreateRequest request) {
-        // TODO: Security Context에서 현재 로그인한 사용자 ID 가져오기
-        Long currentMemberId = 1L; // 임시 하드코딩
-
-        PetResponse response = petService.createPet(currentMemberId, request);
+    public ResponseEntity<ApiResponse<PetResponse>> createPet(
+//            @scit.ainiinu.common.security.annotation.CurrentMember Long memberId,
+            @Valid @RequestBody PetCreateRequest request
+    ) {
+        long memberId = 1L; //하드 코딩으로 인증
+        PetResponse response = petService.createPet(memberId, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
