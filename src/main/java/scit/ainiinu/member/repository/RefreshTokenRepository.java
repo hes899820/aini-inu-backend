@@ -6,7 +6,7 @@ import scit.ainiinu.member.entity.RefreshToken;
 import java.util.Optional;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
-    Optional<RefreshToken> findByToken(String token);
-    void deleteByToken(String token);
+    Optional<RefreshToken> findByTokenHash(String tokenHash);
+    void deleteByTokenHash(String tokenHash);
     Optional<RefreshToken> findByMemberId(Long memberId);
 }
