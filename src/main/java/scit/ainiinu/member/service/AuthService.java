@@ -45,7 +45,7 @@ public class AuthService {
         Long memberId = jwtTokenProvider.validateAndGetMemberId(requestToken);
 
         // 2. DB 저장 여부 확인
-        RefreshToken savedToken = refreshTokenRepository.findByToken(requestToken)
+        RefreshToken savedToken = refreshTokenRepository.findByTokenHash(requestToken)
                 .orElseThrow(() -> new BusinessException(CommonErrorCode.INVALID_TOKEN));
 
         // 3. 회원 확인
