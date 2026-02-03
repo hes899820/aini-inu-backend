@@ -39,6 +39,18 @@ public class PetController {
     }
 
     /**
+     * 내 반려견 목록 조회
+     */
+    @GetMapping("/pets")
+    public ResponseEntity<ApiResponse<List<PetResponse>>> getMyPets(
+//            @scit.ainiinu.common.security.annotation.CurrentMember Long memberId
+    ) {
+        long memberId = 1L; // 하드 코딩으로 인증
+        List<PetResponse> response = petService.getUserPets(memberId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
      * 견종 목록 조회
      */
     @GetMapping("/breeds")

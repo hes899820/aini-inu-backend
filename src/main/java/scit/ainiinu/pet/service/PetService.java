@@ -104,6 +104,15 @@ public class PetService {
     }
 
     /**
+     * 회원의 반려견 목록 조회
+     */
+    public List<PetResponse> getUserPets(Long memberId) {
+        return petRepository.findAllByMemberIdOrderByIsMainDesc(memberId).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 전체 견종 목록 조회
      */
     public List<BreedResponse> getAllBreeds() {

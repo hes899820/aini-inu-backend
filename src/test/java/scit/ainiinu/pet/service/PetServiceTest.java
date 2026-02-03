@@ -196,4 +196,53 @@ class PetServiceTest {
             return req;
         }
     }
+
+    @Nested
+    @DisplayName("회원 반려견 목록 조회")
+    class GetUserPets {
+
+        @Test
+        @DisplayName("성공: 회원의 반려견 목록을 조회한다")
+        void success_get_user_pets() {
+            // given
+            Long memberId = 1L;
+            
+            // Mock Pets
+            Breed breed = mock(Breed.class);
+            Pet mainPet = Pet.builder()
+                    .memberId(memberId)
+                    .breed(breed)
+                    .name("MainDog")
+                    .age(5)
+                    .gender(PetGender.MALE)
+                    .size(PetSize.SMALL)
+                    .isMain(true)
+                    .build();
+
+            Pet subPet = Pet.builder()
+                    .memberId(memberId)
+                    .breed(breed)
+                    .name("SubDog")
+                    .age(2)
+                    .gender(PetGender.FEMALE)
+                    .size(PetSize.MEDIUM)
+                    .isMain(false)
+                    .build();
+
+            given(petRepository.findAllByMemberIdOrderByIsMainDesc(memberId))
+                    .willReturn(List.of(mainPet, subPet));
+
+            // when
+            List<PetResponse> responses = petService.getUserPets(memberId);
+
+            // then
+            assertThat(responses).hasSize(2);
+            assertThat(responses.get(0).getName()).isEqualTo("MainDog");
+            assertThat(responses.get(0).getIsMain()).isTrue();
+            assertThat(responses.get(1).getName()).isEqualTo("SubDog");
+            assertThat(responses.get(1).getIsMain()).isFalse();
+
+            then(petRepository).should(times(1)).findAllByMemberIdOrderByIsMainDesc(memberId);
+        }
+    }
 }
