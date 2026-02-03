@@ -53,7 +53,10 @@ public class PostService {
             posts = postRepository.findByAuthorIdNotIn(blockedUserIds, pageable);
         }
 
-        return SliceResponse.of(posts.map(post -> PostResponse.from(post, memberId, postLikeRepository)));
+        return SliceResponse.of(posts.map(post -> {
+            boolean isLiked = postLikeRepository.existsByPostAndMemberId(post, memberId);
+            return PostResponse.from(post, isLiked);
+        }));
     }
 
     /**
@@ -79,7 +82,10 @@ public class PostService {
                 .map(CommentResponse::from)
                 .collect(Collectors.toList());
 
-        return PostDetailResponse.of(post, commentResponses, memberId, postLikeRepository);
+        // 4. 좋아요 여부 조회
+        boolean isLiked = postLikeRepository.existsByPostAndMemberId(post, memberId);
+
+        return PostDetailResponse.of(post, commentResponses, isLiked);
     }
 
     /**
@@ -114,8 +120,10 @@ public class PostService {
         // 3. 내용 및 이미지 수정 (길이 검증 등은 Entity 내부에서 처리)
         post.update(request.getContent(), request.getImageUrls());
 
-        // 수정한 사용자는 작성자이므로 authorId를 memberId로 사용
-        return PostResponse.from(post, authorId, postLikeRepository);
+        // 4. 좋아요 여부 조회 (수정한 사용자는 작성자이므로 authorId를 사용)
+        boolean isLiked = postLikeRepository.existsByPostAndMemberId(post, authorId);
+
+        return PostResponse.from(post, isLiked);
     }
 
     /**
