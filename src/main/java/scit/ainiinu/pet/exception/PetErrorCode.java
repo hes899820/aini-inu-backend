@@ -13,7 +13,7 @@ public enum PetErrorCode implements ErrorCode {
     INVALID_PET_INFO(HttpStatus.BAD_REQUEST, "P003", "잘못된 반려견 정보입니다"),
     BREED_NOT_FOUND(HttpStatus.BAD_REQUEST, "P004", "존재하지 않는 견종입니다"),
     PERSONALITY_NOT_FOUND(HttpStatus.BAD_REQUEST, "P005", "존재하지 않는 성향입니다"),
-    NOT_PET_OWNER(HttpStatus.FORBIDDEN, "P006", "본인 소유의 반려견이 아닙니다"),
+    NOT_YOUR_PET(HttpStatus.FORBIDDEN, "P006", "본인 소유의 반려견이 아닙니다"),
     INVALID_PET_NAME(HttpStatus.BAD_REQUEST, "P007", "반려견 이름이 유효하지 않습니다"),
     PET_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "P008", "반려견 이름은 10자를 초과할 수 없습니다"),
     INVALID_CERTIFICATION_NUMBER(HttpStatus.BAD_REQUEST, "P009", "동물등록번호 형식이 올바르지 않습니다"),

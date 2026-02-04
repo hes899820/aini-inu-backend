@@ -9,6 +9,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import scit.ainiinu.common.exception.BusinessException;
 import scit.ainiinu.pet.dto.request.PetCreateRequest;
+import scit.ainiinu.pet.dto.request.PetUpdateRequest;
 import scit.ainiinu.pet.dto.response.PetResponse;
 import scit.ainiinu.pet.entity.Breed;
 import scit.ainiinu.pet.entity.Personality;
@@ -70,8 +71,6 @@ class PetServiceTest {
             // save 호출 시 전달된 Pet 객체를 캡처하여 검증해도 되지만, 여기서는 반환값으로 확인
             given(petRepository.save(any(Pet.class))).willAnswer(invocation -> {
                 Pet p = invocation.getArgument(0);
-                // 강제로 ID 주입 (테스트용)
-                // ReflectionTestUtils.setField(p, "id", 1L); 
                 return p;
             });
 
@@ -148,7 +147,6 @@ class PetServiceTest {
             PetResponse response = petService.createPet(memberId, request);
 
             // then
-            // 내부적으로 addWalkingStyle 등이 호출되었는지 확인은 어렵지만, 예외가 안 났다면 성공으로 간주
             then(walkingStyleRepository).should().findByCodeIn(request.getWalkingStyles());
             then(personalityRepository).should().findById(1L);
         }
@@ -243,6 +241,88 @@ class PetServiceTest {
             assertThat(responses.get(1).getIsMain()).isFalse();
 
             then(petRepository).should(times(1)).findAllByMemberIdOrderByIsMainDesc(memberId);
+        }
+    }
+
+    @Nested
+    @DisplayName("반려견 정보 수정")
+    class UpdatePet {
+
+        @Test
+        @DisplayName("성공: 반려견 기본 정보와 관계 정보를 수정한다")
+        void success_update_pet() {
+            // given
+            Long memberId = 1L;
+            Long petId = 100L;
+            PetUpdateRequest request = updateRequest();
+            
+            // Real Pet Object
+            Breed breed = mock(Breed.class);
+            Pet pet = Pet.builder()
+                    .id(petId)
+                    .memberId(memberId)
+                    .breed(breed)
+                    .name("OldName")
+                    .age(2)
+                    .gender(PetGender.MALE)
+                    .size(PetSize.SMALL)
+                    .isNeutered(false)
+                    .isMain(true)
+                    .build();
+            
+            // Spy to verify method calls
+            Pet existingPet = org.mockito.Mockito.spy(pet);
+            
+            given(petRepository.findById(petId)).willReturn(Optional.of(existingPet));
+            
+            // Mocking Relations
+            given(personalityRepository.findById(1L)).willReturn(Optional.of(mock(Personality.class)));
+            given(walkingStyleRepository.findByCodeIn(anyList())).willReturn(List.of(mock(WalkingStyle.class)));
+
+            // when
+            petService.updatePet(memberId, petId, request);
+
+            // then
+            // 1. 상태 변경 확인 (Dirty Checking 유발 확인)
+            assertThat(existingPet.getName()).isEqualTo(request.getName());
+            assertThat(existingPet.getAge()).isEqualTo(request.getAge());
+            assertThat(existingPet.getIsNeutered()).isEqualTo(request.getIsNeutered());
+
+            // 2. 메서드 호출 검증
+            then(existingPet).should().updateBasicInfo(any(), any(), any(), any(), any());
+            then(existingPet).should().clearPersonalities();
+            then(existingPet).should().clearWalkingStyles();
+        }
+
+        @Test
+        @DisplayName("실패: 본인의 반려견이 아니면 수정할 수 없다 (P006)")
+        void fail_not_owner() {
+            // given
+            Long memberId = 1L;
+            Long otherMemberId = 2L;
+            Long petId = 100L;
+            PetUpdateRequest request = updateRequest();
+
+            Pet pet = mock(Pet.class);
+            given(pet.getMemberId()).willReturn(otherMemberId); // 다른 사람 소유
+            given(petRepository.findById(petId)).willReturn(Optional.of(pet));
+
+            // when & then
+            assertThatThrownBy(() -> petService.updatePet(memberId, petId, request))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", PetErrorCode.NOT_YOUR_PET);
+        }
+
+        private PetUpdateRequest updateRequest() {
+            return PetUpdateRequest.builder()
+                    .name("UpdatedName")
+                    .age(5)
+                    .isNeutered(true)
+                    .mbti("INTJ")
+                    .photoUrl("new_url")
+                    .personalityIds(List.of(1L))
+                    .walkingStyleCodes(List.of("RUN"))
+                    .build();
         }
     }
 }

@@ -152,7 +152,21 @@ public class Pet extends BaseTimeEntity {
 
     }
 
+    public void updateBasicInfo(String name, Integer age, Boolean isNeutered, String mbti, String photoUrl) {
+        this.name = name;
+        this.age = age;
+        this.isNeutered = isNeutered;
+        this.mbti = mbti;
+        this.photoUrl = photoUrl;
+    }
 
+    public void clearPersonalities() {
+        this.petPersonalities.clear();
+    }
+
+    public void clearWalkingStyles() {
+        this.petWalkingStyles.clear();
+    }
 
     public void setMain(boolean isMain) {
 

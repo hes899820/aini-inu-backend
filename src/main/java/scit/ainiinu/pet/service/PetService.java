@@ -7,6 +7,7 @@ import scit.ainiinu.pet.dto.response.BreedResponse;
 import scit.ainiinu.pet.dto.response.PersonalityResponse;
 import scit.ainiinu.common.exception.BusinessException;
 import scit.ainiinu.pet.dto.request.PetCreateRequest;
+import scit.ainiinu.pet.dto.request.PetUpdateRequest;
 import scit.ainiinu.pet.dto.response.PetResponse;
 import scit.ainiinu.pet.dto.response.WalkingStyleResponse;
 import scit.ainiinu.pet.entity.Breed;
@@ -101,6 +102,54 @@ public class PetService {
         // 회원 타입 자동 전환: 첫 반려견 등록 시 회원의 memberType이 NON_PET_OWNER -> PET_OWNER로 변경되어야 함.
 
         return toResponse(savedPet);
+    }
+
+    /**
+     * 반려견 정보 수정
+     */
+    @Transactional
+    public PetResponse updatePet(Long memberId, Long petId, PetUpdateRequest request) {
+        // 1. 반려견 조회
+        Pet pet = petRepository.findById(petId)
+                .orElseThrow(() -> new BusinessException(PetErrorCode.PET_NOT_FOUND));
+
+        // 2. 권한 확인 (내 반려견인지?)
+        if (!pet.getMemberId().equals(memberId)) {
+            throw new BusinessException(PetErrorCode.NOT_YOUR_PET);
+        }
+
+        // 3. 기본 정보 수정 (Dirty Checking)
+        pet.updateBasicInfo(
+                request.getName(),
+                request.getAge(),
+                request.getIsNeutered(),
+                request.getMbti(),
+                request.getPhotoUrl()
+        );
+
+        // 4. 성향(Personality) 수정
+        if (request.getPersonalityIds() != null) {
+            pet.clearPersonalities();
+            for (Long pId : request.getPersonalityIds()) {
+                Personality personality = personalityRepository.findById(pId)
+                        .orElseThrow(() -> new BusinessException(PetErrorCode.PERSONALITY_NOT_FOUND));
+                pet.addPersonality(personality);
+            }
+        }
+
+        // 5. 산책 스타일 수정
+        if (request.getWalkingStyleCodes() != null) {
+            pet.clearWalkingStyles();
+            if (!request.getWalkingStyleCodes().isEmpty()) {
+                List<WalkingStyle> styles = walkingStyleRepository.findByCodeIn(request.getWalkingStyleCodes());
+                if (styles.size() != request.getWalkingStyleCodes().size()) {
+                    throw new BusinessException(PetErrorCode.INVALID_PET_INFO);
+                }
+                styles.forEach(pet::addWalkingStyle);
+            }
+        }
+
+        return toResponse(pet);
     }
 
     /**
