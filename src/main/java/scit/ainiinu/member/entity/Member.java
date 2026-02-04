@@ -143,4 +143,8 @@ public class Member extends BaseTimeEntity {
     public void upgradeToPetOwner() {
         this.memberType = MemberType.PET_OWNER;
     }
+
+    public void downgradeToNonPetOwner() {
+        this.memberType = MemberType.NON_PET_OWNER;
+    }
 }

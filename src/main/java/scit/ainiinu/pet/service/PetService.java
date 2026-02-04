@@ -3,11 +3,13 @@ package scit.ainiinu.pet.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import scit.ainiinu.pet.dto.response.BreedResponse;
-import scit.ainiinu.pet.dto.response.PersonalityResponse;
 import scit.ainiinu.common.exception.BusinessException;
+import scit.ainiinu.member.service.MemberService;
 import scit.ainiinu.pet.dto.request.PetCreateRequest;
 import scit.ainiinu.pet.dto.request.PetUpdateRequest;
+import scit.ainiinu.pet.dto.response.BreedResponse;
+import scit.ainiinu.pet.dto.response.MainPetChangeResponse;
+import scit.ainiinu.pet.dto.response.PersonalityResponse;
 import scit.ainiinu.pet.dto.response.PetResponse;
 import scit.ainiinu.pet.dto.response.WalkingStyleResponse;
 import scit.ainiinu.pet.entity.Breed;
@@ -33,6 +35,7 @@ public class PetService {
     private final PersonalityRepository personalityRepository;
     private final WalkingStyleRepository walkingStyleRepository;
     private final AnimalCertificationService animalCertificationService;
+    private final MemberService memberService;
 
     /**
      * 반려견 등록
@@ -49,8 +52,12 @@ public class PetService {
         Breed breed = breedRepository.findById(request.getBreedId())
                 .orElseThrow(() -> new BusinessException(PetErrorCode.BREED_NOT_FOUND));
 
-        // 3. 동물등록번호 검증 (선택 사항)
-        boolean isCertified = animalCertificationService.verify(request.getCertificationNumber());
+        // 3. 동물등록번호 검증 (선택 사항) - 견종과 성별 일치 여부 확인
+        boolean isCertified = animalCertificationService.verify(
+                request.getCertificationNumber(),
+                breed.getName(),
+                request.getGender()
+        );
 
         // 4. 메인 반려견 설정 로직
         boolean isMain = false;
@@ -98,8 +105,10 @@ public class PetService {
         // 7. 저장
         Pet savedPet = petRepository.save(pet);
 
-        // TODO:  MemberService.updateMemberType(memberId, PET_OWNER) 호출 필요
-        // 회원 타입 자동 전환: 첫 반려견 등록 시 회원의 memberType이 NON_PET_OWNER -> PET_OWNER로 변경되어야 함.
+        // 8. 첫 반려견 등록 시 회원 타입 업그레이드
+        if (currentCount == 0) {
+            memberService.upgradeToPetOwner(memberId);
+        }
 
         return toResponse(savedPet);
     }
@@ -175,8 +184,8 @@ public class PetService {
         List<Pet> remainingPets = petRepository.findAllByMemberIdOrderByIsMainDesc(memberId);
 
         if (remainingPets.isEmpty()) {
-            // TODO: MemberService.downgradeToNonPetOwner(memberId) 호출 필요
-            // 마지막 반려견 삭제 시 회원의 memberType이 PET_OWNER -> NON_PET_OWNER로 변경되어야 함.
+            // 마지막 반려견 삭제 시 회원 타입 다운그레이드
+            memberService.downgradeToNonPetOwner(memberId);
         } else if (wasMain) {
             // 삭제된 반려견이 메인이었다면, 남은 반려견 중 하나를 자동으로 메인으로 승격
             Pet newMainPet = remainingPets.get(0);
@@ -191,6 +200,35 @@ public class PetService {
         return petRepository.findAllByMemberIdOrderByIsMainDesc(memberId).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 메인 반려견 변경
+     */
+    @Transactional
+    public MainPetChangeResponse changeMainPet(Long memberId, Long petId) {
+        // 1. 변경 대상 반려견 조회
+        Pet pet = petRepository.findById(petId)
+                .orElseThrow(() -> new BusinessException(PetErrorCode.PET_NOT_FOUND));
+
+        // 2. 권한 확인
+        if (!pet.getMemberId().equals(memberId)) {
+            throw new BusinessException(PetErrorCode.NOT_YOUR_PET);
+        }
+
+        // 3. 이미 메인인 경우 변경 없음
+        if (pet.getIsMain()) {
+            return MainPetChangeResponse.from(pet);
+        }
+
+        // 4. 기존 메인 반려견 해제
+        petRepository.findByMemberIdAndIsMainTrue(memberId)
+                .ifPresent(mainPet -> mainPet.setMain(false));
+
+        // 5. 새로운 메인 반려견 설정
+        pet.setMain(true);
+
+        return MainPetChangeResponse.from(pet);
     }
 
     /**
