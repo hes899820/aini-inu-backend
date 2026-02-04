@@ -153,6 +153,38 @@ public class PetService {
     }
 
     /**
+     * 반려견 삭제
+     */
+    @Transactional
+    public void deletePet(Long memberId, Long petId) {
+        // 1. 반려견 조회
+        Pet pet = petRepository.findById(petId)
+                .orElseThrow(() -> new BusinessException(PetErrorCode.PET_NOT_FOUND));
+
+        // 2. 권한 확인
+        if (!pet.getMemberId().equals(memberId)) {
+            throw new BusinessException(PetErrorCode.NOT_YOUR_PET);
+        }
+
+        boolean wasMain = pet.getIsMain();
+
+        // 3. 삭제
+        petRepository.delete(pet);
+
+        // 4. 후속 처리 로직
+        List<Pet> remainingPets = petRepository.findAllByMemberIdOrderByIsMainDesc(memberId);
+
+        if (remainingPets.isEmpty()) {
+            // TODO: MemberService.downgradeToNonPetOwner(memberId) 호출 필요
+            // 마지막 반려견 삭제 시 회원의 memberType이 PET_OWNER -> NON_PET_OWNER로 변경되어야 함.
+        } else if (wasMain) {
+            // 삭제된 반려견이 메인이었다면, 남은 반려견 중 하나를 자동으로 메인으로 승격
+            Pet newMainPet = remainingPets.get(0);
+            newMainPet.setMain(true);
+        }
+    }
+
+    /**
      * 회원의 반려견 목록 조회
      */
     public List<PetResponse> getUserPets(Long memberId) {

@@ -325,4 +325,71 @@ class PetServiceTest {
                     .build();
         }
     }
+
+    @Nested
+    @DisplayName("반려견 삭제")
+    class DeletePet {
+
+        @Test
+        @DisplayName("성공: 메인 반려견을 삭제하면 남은 아이 중 하나가 메인이 된다")
+        void success_delete_main_pet_promote_other() {
+            // given
+            Long memberId = 1L;
+            Long petId = 100L;
+            Pet mainPet = mock(Pet.class);
+            Pet otherPet = mock(Pet.class);
+
+            given(mainPet.getMemberId()).willReturn(memberId);
+            given(mainPet.getIsMain()).willReturn(true); // 삭제될 아이가 메인임
+
+            given(petRepository.findById(petId)).willReturn(Optional.of(mainPet));
+            // 삭제 후 남은 목록에 otherPet이 있다고 가정
+            given(petRepository.findAllByMemberIdOrderByIsMainDesc(memberId)).willReturn(List.of(otherPet));
+
+            // when
+            petService.deletePet(memberId, petId);
+
+            // then
+            then(petRepository).should().delete(mainPet);
+            then(otherPet).should().setMain(true); // 다른 아이가 메인으로 승격되었는지 확인
+        }
+
+        @Test
+        @DisplayName("성공: 마지막 반려견을 삭제하면 아무것도 남지 않는다")
+        void success_delete_last_pet() {
+            // given
+            Long memberId = 1L;
+            Long petId = 100L;
+            Pet pet = mock(Pet.class);
+
+            given(pet.getMemberId()).willReturn(memberId);
+            given(pet.getIsMain()).willReturn(true);
+
+            given(petRepository.findById(petId)).willReturn(Optional.of(pet));
+            given(petRepository.findAllByMemberIdOrderByIsMainDesc(memberId)).willReturn(List.of()); // 남은 아이 없음
+
+            // when
+            petService.deletePet(memberId, petId);
+
+            // then
+            then(petRepository).should().delete(pet);
+        }
+
+        @Test
+        @DisplayName("실패: 본인의 반려견이 아니면 삭제할 수 없다")
+        void fail_delete_not_owner() {
+            // given
+            Long memberId = 1L;
+            Long otherMemberId = 2L;
+            Long petId = 100L;
+            Pet pet = mock(Pet.class);
+            given(pet.getMemberId()).willReturn(otherMemberId);
+            given(petRepository.findById(petId)).willReturn(Optional.of(pet));
+
+            // when & then
+            assertThatThrownBy(() -> petService.deletePet(memberId, petId))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", PetErrorCode.NOT_YOUR_PET);
+        }
+    }
 }

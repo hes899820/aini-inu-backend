@@ -2,6 +2,7 @@ package scit.ainiinu.pet.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,6 +54,19 @@ public class PetController {
         long memberId = 1L; // 하드 코딩으로 인증
         PetResponse response = petService.updatePet(memberId, petId, request);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 반려견 삭제
+     */
+    @DeleteMapping("/pets/{petId}")
+    public ResponseEntity<ApiResponse<Void>> deletePet(
+            @PathVariable Long petId
+            // @CurrentMember Long memberId
+    ) {
+        long memberId = 1L; // 하드 코딩으로 인증
+        petService.deletePet(memberId, petId);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**
