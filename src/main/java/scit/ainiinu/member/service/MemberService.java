@@ -88,4 +88,26 @@ public class MemberService {
                 .map(MemberPersonalityTypeResponse::from)
                 .collect(Collectors.toList());
     }
+
+    /**
+     * 회원 타입을 반려견 보유자(PET_OWNER)로 업그레이드
+     * 첫 반려견 등록 시 호출됨
+     */
+    @Transactional
+    public void upgradeToPetOwner(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new MemberException(MemberErrorCode.MEMBER_NOT_FOUND));
+        member.upgradeToPetOwner();
+    }
+
+    /**
+     * 회원 타입을 비반려견 보유자(NON_PET_OWNER)로 다운그레이드
+     * 마지막 반려견 삭제 시 호출됨
+     */
+    @Transactional
+    public void downgradeToNonPetOwner(Long memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new MemberException(MemberErrorCode.MEMBER_NOT_FOUND));
+        member.downgradeToNonPetOwner();
+    }
 }

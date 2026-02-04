@@ -54,7 +54,7 @@ public class Pet extends BaseTimeEntity {
 
     
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 10)
 
     private String name;
 
