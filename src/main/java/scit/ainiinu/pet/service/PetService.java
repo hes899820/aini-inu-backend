@@ -3,10 +3,13 @@ package scit.ainiinu.pet.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import scit.ainiinu.pet.dto.response.BreedResponse;
-import scit.ainiinu.pet.dto.response.PersonalityResponse;
 import scit.ainiinu.common.exception.BusinessException;
+import scit.ainiinu.member.service.MemberService;
 import scit.ainiinu.pet.dto.request.PetCreateRequest;
+import scit.ainiinu.pet.dto.request.PetUpdateRequest;
+import scit.ainiinu.pet.dto.response.BreedResponse;
+import scit.ainiinu.pet.dto.response.MainPetChangeResponse;
+import scit.ainiinu.pet.dto.response.PersonalityResponse;
 import scit.ainiinu.pet.dto.response.PetResponse;
 import scit.ainiinu.pet.dto.response.WalkingStyleResponse;
 import scit.ainiinu.pet.entity.Breed;
@@ -31,6 +34,8 @@ public class PetService {
     private final BreedRepository breedRepository;
     private final PersonalityRepository personalityRepository;
     private final WalkingStyleRepository walkingStyleRepository;
+    private final AnimalCertificationService animalCertificationService;
+    private final MemberService memberService;
 
     /**
      * 반려견 등록
@@ -47,19 +52,24 @@ public class PetService {
         Breed breed = breedRepository.findById(request.getBreedId())
                 .orElseThrow(() -> new BusinessException(PetErrorCode.BREED_NOT_FOUND));
 
-        // 3. 메인 반려견 설정 로직
-        // 첫 등록이면 무조건 메인, 아니면 요청값 따르되 기본은 false
+        // 3. 동물등록번호 검증 (선택 사항) - 견종과 성별 일치 여부 확인
+        boolean isCertified = animalCertificationService.verify(
+                request.getCertificationNumber(),
+                breed.getName(),
+                request.getGender()
+        );
+
+        // 4. 메인 반려견 설정 로직
         boolean isMain = false;
         if (currentCount == 0) {
             isMain = true;
         } else if (request.getIsMain() != null && request.getIsMain()) {
-            // 이미 메인이 있는데 새로 메인으로 등록하려는 경우, 기존 메인 해제 필요
             petRepository.findByMemberIdAndIsMainTrue(memberId)
                     .ifPresent(mainPet -> mainPet.setMain(false));
             isMain = true;
         }
 
-        // 4. Pet 엔티티 생성
+        // 5. Pet 엔티티 생성
         Pet pet = Pet.builder()
                 .memberId(memberId)
                 .breed(breed)
@@ -72,10 +82,10 @@ public class PetService {
                 .photoUrl(request.getPhotoUrl())
                 .isMain(isMain)
                 .certificationNumber(request.getCertificationNumber())
-                .isCertified(false) // 초기엔 미인증, 추후 검증 API 통해 true로 변경
+                .isCertified(isCertified)
                 .build();
 
-        // 5. 성향(Personality) 관계 설정
+        // 6. 성향(Personality) 및 산책 스타일 관계 설정
         if (request.getPersonalityIds() != null) {
             for (Long pId : request.getPersonalityIds()) {
                 Personality personality = personalityRepository.findById(pId)
@@ -84,27 +94,141 @@ public class PetService {
             }
         }
 
-        // 6. 산책 스타일(WalkingStyle) 관계 설정
         if (request.getWalkingStyles() != null && !request.getWalkingStyles().isEmpty()) {
             List<WalkingStyle> styles = walkingStyleRepository.findByCodeIn(request.getWalkingStyles());
-            
-            // 요청한 코드 수와 조회된 스타일 수가 다르면 유효하지 않은 코드가 포함된 것임
-            // (중복 코드가 요청에 없다는 가정 하에, 혹은 Set으로 변환하여 비교)
             if (styles.size() != request.getWalkingStyles().size()) {
                  throw new BusinessException(PetErrorCode.INVALID_PET_INFO);
             }
-            
-            for (WalkingStyle style : styles) {
-                pet.addWalkingStyle(style);
-            }
+            styles.forEach(pet::addWalkingStyle);
         }
 
         // 7. 저장
         Pet savedPet = petRepository.save(pet);
 
-        // TODO: 회원의 memberType을 PET_OWNER로 변경하는 로직 필요 (MemberService)
+        // 8. 첫 반려견 등록 시 회원 타입 업그레이드
+        if (currentCount == 0) {
+            memberService.upgradeToPetOwner(memberId);
+        }
 
         return toResponse(savedPet);
+    }
+
+    /**
+     * 반려견 정보 수정
+     */
+    @Transactional
+    public PetResponse updatePet(Long memberId, Long petId, PetUpdateRequest request) {
+        // 1. 반려견 조회
+        Pet pet = petRepository.findById(petId)
+                .orElseThrow(() -> new BusinessException(PetErrorCode.PET_NOT_FOUND));
+
+        // 2. 권한 확인 (내 반려견인지?)
+        if (!pet.getMemberId().equals(memberId)) {
+            throw new BusinessException(PetErrorCode.NOT_YOUR_PET);
+        }
+
+        // 3. 기본 정보 수정 (Dirty Checking)
+        pet.updateBasicInfo(
+                request.getName(),
+                request.getAge(),
+                request.getIsNeutered(),
+                request.getMbti(),
+                request.getPhotoUrl()
+        );
+
+        // 4. 성향(Personality) 수정
+        if (request.getPersonalityIds() != null) {
+            pet.clearPersonalities();
+            for (Long pId : request.getPersonalityIds()) {
+                Personality personality = personalityRepository.findById(pId)
+                        .orElseThrow(() -> new BusinessException(PetErrorCode.PERSONALITY_NOT_FOUND));
+                pet.addPersonality(personality);
+            }
+        }
+
+        // 5. 산책 스타일 수정
+        if (request.getWalkingStyleCodes() != null) {
+            pet.clearWalkingStyles();
+            if (!request.getWalkingStyleCodes().isEmpty()) {
+                List<WalkingStyle> styles = walkingStyleRepository.findByCodeIn(request.getWalkingStyleCodes());
+                if (styles.size() != request.getWalkingStyleCodes().size()) {
+                    throw new BusinessException(PetErrorCode.INVALID_PET_INFO);
+                }
+                styles.forEach(pet::addWalkingStyle);
+            }
+        }
+
+        return toResponse(pet);
+    }
+
+    /**
+     * 반려견 삭제
+     */
+    @Transactional
+    public void deletePet(Long memberId, Long petId) {
+        // 1. 반려견 조회
+        Pet pet = petRepository.findById(petId)
+                .orElseThrow(() -> new BusinessException(PetErrorCode.PET_NOT_FOUND));
+
+        // 2. 권한 확인
+        if (!pet.getMemberId().equals(memberId)) {
+            throw new BusinessException(PetErrorCode.NOT_YOUR_PET);
+        }
+
+        boolean wasMain = pet.getIsMain();
+
+        // 3. 삭제
+        petRepository.delete(pet);
+
+        // 4. 후속 처리 로직
+        List<Pet> remainingPets = petRepository.findAllByMemberIdOrderByIsMainDesc(memberId);
+
+        if (remainingPets.isEmpty()) {
+            // 마지막 반려견 삭제 시 회원 타입 다운그레이드
+            memberService.downgradeToNonPetOwner(memberId);
+        } else if (wasMain) {
+            // 삭제된 반려견이 메인이었다면, 남은 반려견 중 하나를 자동으로 메인으로 승격
+            Pet newMainPet = remainingPets.get(0);
+            newMainPet.setMain(true);
+        }
+    }
+
+    /**
+     * 회원의 반려견 목록 조회
+     */
+    public List<PetResponse> getUserPets(Long memberId) {
+        return petRepository.findAllByMemberIdOrderByIsMainDesc(memberId).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 메인 반려견 변경
+     */
+    @Transactional
+    public MainPetChangeResponse changeMainPet(Long memberId, Long petId) {
+        // 1. 변경 대상 반려견 조회
+        Pet pet = petRepository.findById(petId)
+                .orElseThrow(() -> new BusinessException(PetErrorCode.PET_NOT_FOUND));
+
+        // 2. 권한 확인
+        if (!pet.getMemberId().equals(memberId)) {
+            throw new BusinessException(PetErrorCode.NOT_YOUR_PET);
+        }
+
+        // 3. 이미 메인인 경우 변경 없음
+        if (pet.getIsMain()) {
+            return MainPetChangeResponse.from(pet);
+        }
+
+        // 4. 기존 메인 반려견 해제
+        petRepository.findByMemberIdAndIsMainTrue(memberId)
+                .ifPresent(mainPet -> mainPet.setMain(false));
+
+        // 5. 새로운 메인 반려견 설정
+        pet.setMain(true);
+
+        return MainPetChangeResponse.from(pet);
     }
 
     /**

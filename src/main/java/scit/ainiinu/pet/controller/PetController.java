@@ -1,18 +1,24 @@
 package scit.ainiinu.pet.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import scit.ainiinu.common.response.ApiResponse;
-import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
+import scit.ainiinu.common.security.annotation.CurrentMember;
 import scit.ainiinu.pet.dto.request.PetCreateRequest;
-import scit.ainiinu.pet.dto.response.PetResponse;
+import scit.ainiinu.pet.dto.request.PetUpdateRequest;
 import scit.ainiinu.pet.dto.response.BreedResponse;
+import scit.ainiinu.pet.dto.response.MainPetChangeResponse;
 import scit.ainiinu.pet.dto.response.PersonalityResponse;
+import scit.ainiinu.pet.dto.response.PetResponse;
 import scit.ainiinu.pet.dto.response.WalkingStyleResponse;
 import scit.ainiinu.pet.service.PetService;
 
@@ -29,11 +35,59 @@ public class PetController {
      * 반려견 등록
      */
     @PostMapping("/pets")
-    public ResponseEntity<ApiResponse<PetResponse>> createPet(@Valid @RequestBody PetCreateRequest request) {
-        // TODO: Security Context에서 현재 로그인한 사용자 ID 가져오기
-        Long currentMemberId = 1L; // 임시 하드코딩
+    public ResponseEntity<ApiResponse<PetResponse>> createPet(
+            @CurrentMember Long memberId,
+            @Valid @RequestBody PetCreateRequest request
+    ) {
+        PetResponse response = petService.createPet(memberId, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 
-        PetResponse response = petService.createPet(currentMemberId, request);
+    /**
+     * 반려견 정보 수정
+     */
+    @PatchMapping("/pets/{petId}")
+    public ResponseEntity<ApiResponse<PetResponse>> updatePet(
+            @CurrentMember Long memberId,
+            @PathVariable Long petId,
+            @Valid @RequestBody PetUpdateRequest request
+    ) {
+        PetResponse response = petService.updatePet(memberId, petId, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 반려견 삭제
+     */
+    @DeleteMapping("/pets/{petId}")
+    public ResponseEntity<ApiResponse<Void>> deletePet(
+            @CurrentMember Long memberId,
+            @PathVariable Long petId
+    ) {
+        petService.deletePet(memberId, petId);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    /**
+     * 내 반려견 목록 조회
+     */
+    @GetMapping("/pets")
+    public ResponseEntity<ApiResponse<List<PetResponse>>> getMyPets(
+            @CurrentMember Long memberId
+    ) {
+        List<PetResponse> response = petService.getUserPets(memberId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 메인 반려견 변경
+     */
+    @PatchMapping("/pets/{petId}/main")
+    public ResponseEntity<ApiResponse<MainPetChangeResponse>> changeMainPet(
+            @CurrentMember Long memberId,
+            @PathVariable Long petId
+    ) {
+        MainPetChangeResponse response = petService.changeMainPet(memberId, petId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
